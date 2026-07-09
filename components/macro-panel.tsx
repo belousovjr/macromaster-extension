@@ -23,7 +23,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { closeActiveProject, type MacroProject } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 
-const STORAGE_KEY = "macromaster:panel-bounds";
+const STORAGE_KEY_PREFIX = "macromaster:panel-bounds";
 const MIN_WIDTH = 300;
 const MAX_WIDTH = 560;
 const MIN_HEIGHT = 220;
@@ -115,9 +115,13 @@ function getDefaultBounds(): Bounds {
   });
 }
 
-function getStoredBounds(): Bounds {
+function getBoundsStorageKey(projectId: string) {
+  return `${STORAGE_KEY_PREFIX}:${projectId}`;
+}
+
+function getStoredBounds(projectId: string): Bounds {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = localStorage.getItem(getBoundsStorageKey(projectId));
     if (!stored) return getDefaultBounds();
 
     return clampBounds(JSON.parse(stored) as Bounds);
@@ -1157,7 +1161,10 @@ function SelectionBuilderPanel({
 }
 
 export function MacroPanel({ project }: MacroPanelProps) {
-  const [bounds, setBounds] = React.useState<Bounds>(getStoredBounds);
+  const [bounds, setBounds] = React.useState<Bounds>(() =>
+    getStoredBounds(project.id),
+  );
+  const [boundsProjectId, setBoundsProjectId] = React.useState(project.id);
   const [interaction, setInteraction] = React.useState<Interaction | null>(
     null,
   );
@@ -1268,8 +1275,21 @@ export function MacroPanel({ project }: MacroPanelProps) {
   );
 
   React.useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(bounds));
-  }, [bounds]);
+    if (boundsProjectId === project.id) return;
+
+    setInteraction(null);
+    setBounds(getStoredBounds(project.id));
+    setBoundsProjectId(project.id);
+  }, [boundsProjectId, project.id]);
+
+  React.useEffect(() => {
+    if (boundsProjectId !== project.id) return;
+
+    localStorage.setItem(
+      getBoundsStorageKey(project.id),
+      JSON.stringify(bounds),
+    );
+  }, [bounds, boundsProjectId, project.id]);
 
   React.useEffect(() => {
     const handleResize = () => setBounds((current) => clampBounds(current));
