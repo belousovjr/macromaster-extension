@@ -1,9 +1,21 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import type { Root } from 'react-dom/client';
 
 import { MacroPanel } from '@/components/macro-panel';
-import { getPanelEnabled, PANEL_VISIBILITY_KEY } from '@/lib/panel-visibility';
+import {
+  ACTIVE_PROJECT_ID_KEY,
+  getActiveProject,
+  getProjectState,
+  type MacroProject,
+  PROJECTS_KEY,
+} from '@/lib/projects';
 import '@/styles/content.css';
+
+type MountedPanel = {
+  root: Root;
+  render: (project: MacroProject) => void;
+};
 
 export default defineContentScript({
   matches: ['<all_urls>'],
@@ -16,37 +28,43 @@ export default defineContentScript({
       isolateEvents: true,
       onMount(container) {
         const root = ReactDOM.createRoot(container);
-        root.render(
-          <React.StrictMode>
-            <MacroPanel />
-          </React.StrictMode>,
-        );
+        const render = (project: MacroProject) => {
+          root.render(
+            <React.StrictMode>
+              <MacroPanel project={project} />
+            </React.StrictMode>,
+          );
+        };
 
-        return root;
+        return { root, render } satisfies MountedPanel;
       },
-      onRemove(root) {
-        root?.unmount();
+      onRemove(mounted) {
+        mounted?.root.unmount();
       },
     });
 
-    if (await getPanelEnabled()) {
+    const syncPanel = async () => {
+      const activeProject = getActiveProject(await getProjectState());
+
+      if (!activeProject) {
+        ui.remove();
+        return;
+      }
+
       ui.mount();
-    }
+      ui.mounted?.render(activeProject);
+    };
+
+    await syncPanel();
 
     const handleStorageChange: Parameters<
       typeof browser.storage.onChanged.addListener
     >[0] = (changes, areaName) => {
       if (areaName !== 'local') return;
 
-      const panelChange = changes[PANEL_VISIBILITY_KEY];
-      if (!panelChange) return;
-
-      if ((panelChange.newValue as boolean | undefined) ?? true) {
-        ui.mount();
-        return;
+      if (changes[ACTIVE_PROJECT_ID_KEY] || changes[PROJECTS_KEY]) {
+        void syncPanel();
       }
-
-      ui.remove();
     };
 
     browser.storage.onChanged.addListener(handleStorageChange);

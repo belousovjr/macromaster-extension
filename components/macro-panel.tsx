@@ -1,6 +1,8 @@
 import * as React from "react";
-import { GripHorizontal } from "lucide-react";
+import { GripHorizontal, X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
+import { closeActiveProject, type MacroProject } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "macromaster:panel-bounds";
@@ -83,7 +85,11 @@ function clampBounds(bounds: Bounds): Bounds {
   };
 }
 
-export function MacroPanel() {
+type MacroPanelProps = {
+  project: MacroProject;
+};
+
+export function MacroPanel({ project }: MacroPanelProps) {
   const [bounds, setBounds] = React.useState<Bounds>(getStoredBounds);
   const [interaction, setInteraction] = React.useState<Interaction | null>(
     null,
@@ -192,13 +198,27 @@ export function MacroPanel() {
           />
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold leading-none">
-              MacroMaster
+              {project.name}
             </div>
           </div>
+          <Button
+            aria-label="Close project"
+            className="size-7 text-muted-foreground hover:text-foreground"
+            onClick={() => void closeActiveProject()}
+            onPointerDown={(event) => event.stopPropagation()}
+            size="icon"
+            type="button"
+            variant="ghost"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </Button>
         </header>
 
-        <main className="flex flex-1 items-center justify-center bg-card px-6 py-8">
+        <main className="flex flex-1 flex-col items-center justify-center gap-2 bg-card px-6 py-8 text-center">
           <p className="text-sm font-medium text-foreground">Hello world</p>
+          <p className="max-w-full truncate text-xs text-muted-foreground">
+            {project.id}
+          </p>
         </main>
 
         <button

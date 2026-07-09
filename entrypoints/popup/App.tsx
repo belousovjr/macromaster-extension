@@ -1,37 +1,45 @@
 import { useEffect, useState } from 'react';
 
 import {
-  DEFAULT_PANEL_ENABLED,
-  getPanelEnabled,
-  PANEL_VISIBILITY_KEY,
-  setPanelEnabled,
-} from '@/lib/panel-visibility';
+  ACTIVE_PROJECT_ID_KEY,
+  createProjectAndOpen,
+  getProjectState,
+  openProject,
+  type ProjectState,
+  PROJECTS_KEY,
+} from '@/lib/projects';
+
+const EMPTY_STATE: ProjectState = {
+  projects: [],
+  activeProjectId: null,
+};
 
 function App() {
-  const [enabled, setEnabled] = useState(DEFAULT_PANEL_ENABLED);
+  const [state, setState] = useState<ProjectState>(EMPTY_STATE);
+  const [projectName, setProjectName] = useState('');
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
-    getPanelEnabled().then((storedEnabled) => {
+    const syncProjects = async () => {
+      const nextState = await getProjectState();
       if (!isMounted) return;
 
-      setEnabled(storedEnabled);
+      setState(nextState);
       setIsReady(true);
-    });
+    };
+
+    void syncProjects();
 
     const handleStorageChange: Parameters<
       typeof browser.storage.onChanged.addListener
     >[0] = (changes, areaName) => {
       if (areaName !== 'local') return;
 
-      const panelChange = changes[PANEL_VISIBILITY_KEY];
-      if (!panelChange) return;
-
-      setEnabled(
-        (panelChange.newValue as boolean | undefined) ?? DEFAULT_PANEL_ENABLED,
-      );
+      if (changes[PROJECTS_KEY] || changes[ACTIVE_PROJECT_ID_KEY]) {
+        void syncProjects();
+      }
     };
 
     browser.storage.onChanged.addListener(handleStorageChange);
@@ -42,35 +50,78 @@ function App() {
     };
   }, []);
 
-  const togglePanel = async () => {
-    const nextEnabled = !enabled;
-    setEnabled(nextEnabled);
-    await setPanelEnabled(nextEnabled);
+  const handleCreateProject = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!projectName.trim()) return;
+
+    await createProjectAndOpen(projectName);
+    setProjectName('');
   };
 
   return (
     <main className="popup-shell">
       <div>
         <p className="eyebrow">MacroMaster</p>
-        <h1>Side panel</h1>
+        <h1>Projects</h1>
       </div>
 
-      <button
-        aria-checked={enabled}
-        className="toggle-row"
-        disabled={!isReady}
-        onClick={togglePanel}
-        role="switch"
-        type="button"
-      >
-        <span>
-          <span className="toggle-title">Show on pages</span>
-          <span className="toggle-status">{enabled ? 'Enabled' : 'Disabled'}</span>
-        </span>
-        <span className="switch-track" data-state={enabled ? 'checked' : 'unchecked'}>
-          <span className="switch-thumb" />
-        </span>
-      </button>
+      <form className="project-form" onSubmit={handleCreateProject}>
+        <label className="field-label" htmlFor="project-name">
+          New project
+        </label>
+        <div className="create-row">
+          <input
+            autoComplete="off"
+            className="project-input"
+            disabled={!isReady}
+            id="project-name"
+            onChange={(event) => setProjectName(event.target.value)}
+            placeholder="Project name"
+            type="text"
+            value={projectName}
+          />
+          <button
+            className="primary-button"
+            disabled={!isReady || !projectName.trim()}
+            type="submit"
+          >
+            Create
+          </button>
+        </div>
+      </form>
+
+      <section className="projects-section" aria-label="Existing projects">
+        <div className="table-header">
+          <span>Name</span>
+          <span>Status</span>
+        </div>
+        <div className="project-table" role="list">
+          {state.projects.length === 0 ? (
+            <p className="empty-state">No projects yet</p>
+          ) : (
+            state.projects.map((project) => {
+              const isActive = project.id === state.activeProjectId;
+
+              return (
+                <button
+                  className="project-row"
+                  disabled={!isReady}
+                  key={project.id}
+                  onClick={() => void openProject(project.id)}
+                  role="listitem"
+                  type="button"
+                >
+                  <span className="project-name">{project.name}</span>
+                  <span className={isActive ? 'status active' : 'status'}>
+                    {isActive ? 'Open' : 'Closed'}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      </section>
     </main>
   );
 }

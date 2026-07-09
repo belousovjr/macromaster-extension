@@ -12,18 +12,19 @@
 
 body {
   margin: 0;
-  min-width: 320px;
+  min-width: 380px;
   background: #f7f8fa;
 }
 
-button {
+button,
+input {
   font: inherit;
 }
 
 .popup-shell {
   display: grid;
   gap: 16px;
-  width: 320px;
+  width: 380px;
   padding: 18px;
 }
 
@@ -43,84 +44,162 @@ h1 {
   line-height: 1.2;
 }
 
-.toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  width: 100%;
-  min-height: 68px;
+.project-form {
+  display: grid;
+  gap: 8px;
+}
+
+.field-label {
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.create-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.project-input {
+  min-width: 0;
+  height: 38px;
   border: 1px solid #d8dee6;
   border-radius: 8px;
-  padding: 14px;
+  padding: 0 11px;
   color: #111827;
   background: #ffffff;
-  cursor: pointer;
-  text-align: left;
+  outline: none;
   transition:
     border-color 150ms ease,
     box-shadow 150ms ease;
 }
 
-.toggle-row:hover {
-  border-color: #b7c0cc;
-  box-shadow: 0 8px 24px rgb(15 23 42 / 8%);
+.project-input:focus {
+  border-color: #486581;
+  box-shadow: 0 0 0 3px rgb(72 101 129 / 14%);
 }
 
-.toggle-row:focus-visible {
-  outline: 2px solid #486581;
-  outline-offset: 2px;
-}
-
-.toggle-row:disabled {
+.project-input:disabled {
   cursor: wait;
   opacity: 0.72;
 }
 
-.toggle-title,
-.toggle-status {
-  display: block;
+.primary-button {
+  height: 38px;
+  border: 1px solid #2f4f4f;
+  border-radius: 8px;
+  padding: 0 14px;
+  color: #ffffff;
+  background: #2f4f4f;
+  cursor: pointer;
+  font-weight: 700;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
 }
 
-.toggle-title {
-  font-size: 14px;
+.primary-button:hover:not(:disabled) {
+  border-color: #263f3f;
+  background: #263f3f;
+}
+
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.projects-section {
+  overflow: hidden;
+  border: 1px solid #d8dee6;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e4e8ee;
+  padding: 9px 12px;
+  color: #667085;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.project-table {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.project-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #eef1f5;
+  padding: 12px;
+  color: #111827;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.project-row:last-child {
+  border-bottom: 0;
+}
+
+.project-row:hover {
+  background: #f3f6f8;
+}
+
+.project-row:focus-visible,
+.primary-button:focus-visible {
+  outline: 2px solid #486581;
+  outline-offset: -2px;
+}
+
+.project-row:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.project-name {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.toggle-status {
-  margin-top: 3px;
-  color: #667085;
-  font-size: 12px;
-  line-height: 1.35;
-}
-
-.switch-track {
-  position: relative;
-  width: 42px;
-  height: 24px;
-  flex: 0 0 auto;
+.status {
+  align-self: center;
   border-radius: 999px;
-  background: #c7ced8;
-  transition: background 150ms ease;
+  padding: 3px 8px;
+  color: #667085;
+  background: #eef1f5;
+  font-size: 12px;
+  font-weight: 700;
 }
 
-.switch-track[data-state='checked'] {
+.status.active {
+  color: #ffffff;
   background: #2f4f4f;
 }
 
-.switch-thumb {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 18px;
-  height: 18px;
-  border-radius: 999px;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgb(15 23 42 / 28%);
-  transition: transform 150ms ease;
-}
-
-.switch-track[data-state='checked'] .switch-thumb {
-  transform: translateX(18px);
+.empty-state {
+  margin: 0;
+  padding: 22px 12px;
+  color: #667085;
+  font-size: 13px;
+  text-align: center;
 }
