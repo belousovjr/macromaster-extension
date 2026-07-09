@@ -964,7 +964,12 @@ function SelectionBuilderPanel({
           pointerEvents: panelsTranslucent ? "none" : "auto",
         }}
       >
-        <header className="flex items-center justify-between gap-3 border-b border-border px-3 py-2.5">
+        <header
+          className={cn(
+            "sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-border px-3 py-2.5",
+            panelsTranslucent ? "bg-card/20" : "bg-card",
+          )}
+        >
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold">
               <span className="text-primary">
