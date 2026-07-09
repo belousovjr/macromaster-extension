@@ -1,5 +1,8 @@
 import { useEffect, useState } from 'react';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   ACTIVE_PROJECT_ID_KEY,
   ACTIVE_PROJECT_TAB_ID_KEY,
@@ -9,6 +12,7 @@ import {
   type ProjectState,
   PROJECTS_KEY,
 } from '@/lib/projects';
+import { cn } from '@/lib/utils';
 
 const EMPTY_STATE: ProjectState = {
   projects: [],
@@ -167,20 +171,24 @@ function App() {
   };
 
   return (
-    <main className="popup-shell">
+    <main className="macro-master-popup grid w-[420px] gap-4 bg-background p-[18px] text-foreground">
       <div>
-        <p className="eyebrow">MacroMaster</p>
-        <h1>Projects</h1>
+        <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
+          MacroMaster
+        </p>
+        <h1 className="text-xl font-semibold leading-tight">Projects</h1>
       </div>
 
-      <form className="project-form" onSubmit={handleCreateProject}>
-        <label className="field-label" htmlFor="project-name">
+      <form className="grid gap-2" onSubmit={handleCreateProject}>
+        <label
+          className="text-xs font-semibold text-muted-foreground"
+          htmlFor="project-name"
+        >
           New project
         </label>
-        <div className="create-row">
-          <input
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <Input
             autoComplete="off"
-            className="project-input"
             disabled={!isReady}
             id="project-name"
             onChange={(event) => setProjectName(event.target.value)}
@@ -188,24 +196,28 @@ function App() {
             type="text"
             value={projectName}
           />
-          <button
-            className="primary-button"
+          <Button
             disabled={!isReady || currentTab == null || !projectName.trim()}
             type="submit"
           >
             Create
-          </button>
+          </Button>
         </div>
       </form>
 
-      <section className="projects-section" aria-label="Existing projects">
-        <div className="table-header">
+      <section
+        className="overflow-hidden rounded-lg border border-border bg-card"
+        aria-label="Existing projects"
+      >
+        <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
           <span>Name</span>
           <span>Status</span>
         </div>
-        <div className="project-table" role="list">
+        <div className="max-h-[220px] overflow-y-auto" role="list">
           {state.projects.length === 0 ? (
-            <p className="empty-state">No projects yet</p>
+            <p className="m-0 px-3 py-6 text-center text-sm text-muted-foreground">
+              No projects yet
+            </p>
           ) : (
             state.projects.map((project) => {
               const isActive = project.id === state.activeProjectId;
@@ -214,7 +226,7 @@ function App() {
 
               return (
                 <button
-                  className="project-row"
+                  className="grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-0 border-b border-border bg-transparent px-3 py-3 text-left text-foreground transition-colors last:border-b-0 hover:bg-accent disabled:cursor-wait disabled:opacity-70"
                   disabled={!isReady || currentTabId == null}
                   key={project.id}
                   onClick={() => {
@@ -225,10 +237,18 @@ function App() {
                   role="listitem"
                   type="button"
                 >
-                  <span className="project-name">{project.name}</span>
-                  <span className={isActive ? 'status active' : 'status'}>
-                    {status}
+                  <span className="min-w-0 truncate text-sm font-semibold leading-tight">
+                    {project.name}
                   </span>
+                  <Badge
+                    className={cn(
+                      'max-w-[190px] truncate',
+                      isActive && 'bg-primary text-primary-foreground',
+                    )}
+                    variant={isActive ? 'default' : 'secondary'}
+                  >
+                    {status}
+                  </Badge>
                 </button>
               );
             })
