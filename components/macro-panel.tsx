@@ -239,10 +239,10 @@ function getInitialSelectorState(element: Element): SelectorState {
   const index = getElementIndex(element);
 
   return {
-    mode: element.id ? "single" : "series",
-    single: element.id ? "id" : null,
+    mode: "single",
+    single: "nth",
     series: {
-      tag: !element.id,
+      tag: true,
       classes: [],
       attributes: [],
       position: {
@@ -776,7 +776,7 @@ function SelectionBuilderPanel({
         return {
           ...current,
           mode,
-          single: current.single ?? (element.id ? "id" : "nth"),
+          single: current.single ?? "nth",
         };
       }
 
@@ -1178,7 +1178,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
     React.useState(false);
   const [frontPanel, setFrontPanel] = React.useState<FrontPanel>("floating");
   const [selectorState, setSelectorState] = React.useState<SelectorState>({
-    mode: "series",
+    mode: "single",
     single: null,
     series: {
       tag: true,
