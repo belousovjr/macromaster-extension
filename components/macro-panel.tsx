@@ -52,12 +52,20 @@ type PickedElement = {
 
 type SelectorMode = "single" | "series";
 type SingleSelectorKind = "id" | "nth" | "first" | "last";
+type SeriesPositionKind = "any" | "first" | "last" | "exact" | "formula";
+
+type SeriesPositionState = {
+  kind: SeriesPositionKind;
+  exact: number;
+  step: number;
+  offset: number;
+};
 
 type SeriesSelectorState = {
   tag: boolean;
   classes: string[];
   attributes: string[];
-  nth: boolean;
+  position: SeriesPositionState;
 };
 
 type SelectorState = {
@@ -204,6 +212,8 @@ function getAttributeOptions(element: Element): SelectorOption[] {
 }
 
 function getInitialSelectorState(element: Element): SelectorState {
+  const index = getElementIndex(element);
+
   return {
     mode: element.id ? "single" : "series",
     single: element.id ? "id" : null,
@@ -211,7 +221,12 @@ function getInitialSelectorState(element: Element): SelectorState {
       tag: !element.id,
       classes: [],
       attributes: [],
-      nth: false,
+      position: {
+        kind: "any",
+        exact: index,
+        step: 2,
+        offset: index,
+      },
     },
   };
 }
@@ -248,15 +263,26 @@ function buildSeriesSelector(element: Element, state: SeriesSelectorState) {
 
     parts.push(`[${cssEscape(attributeName)}="${cssString(attributeValue)}"]`);
   });
-  if (state.nth) {
-    parts.push(`:nth-child(${getElementIndex(element)})`);
+  if (state.position.kind === "first") {
+    parts.push(":first-child");
+  }
+  if (state.position.kind === "last") {
+    parts.push(":last-child");
+  }
+  if (state.position.kind === "exact") {
+    parts.push(`:nth-child(${Math.max(1, Math.round(state.position.exact))})`);
+  }
+  if (state.position.kind === "formula") {
+    const step = Math.max(1, Math.round(state.position.step));
+    const offset = Math.max(0, Math.round(state.position.offset));
+    parts.push(`:nth-child(${step}n${offset === 0 ? "" : `+${offset}`})`);
   }
 
   if (
     !state.tag &&
     state.classes.length === 0 &&
     state.attributes.length === 0 &&
-    !state.nth
+    state.position.kind === "any"
   ) {
     return null;
   }
@@ -677,7 +703,7 @@ function SelectionBuilderPanel({
         current.series.tag ||
         current.series.classes.length > 0 ||
         current.series.attributes.length > 0 ||
-        current.series.nth;
+        current.series.position.kind !== "any";
 
       return {
         ...current,
@@ -862,16 +888,6 @@ function SelectionBuilderPanel({
                     }))
                   }
                 />
-                <Checkbox
-                  checked={selectorState.series.nth}
-                  label={`same nth-child(${getElementIndex(element)})`}
-                  onChange={(checked) =>
-                    setSelectorState((current) => ({
-                      ...current,
-                      series: { ...current.series, nth: checked },
-                    }))
-                  }
-                />
                 {classOptions.map((option) => (
                   <Checkbox
                     checked={selectorState.series.classes.includes(
@@ -894,6 +910,143 @@ function SelectionBuilderPanel({
                     }
                   />
                 ))}
+              </div>
+              <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+                <div style={legendStyle}>Position pattern</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {[
+                    { kind: "any" as const, label: "Any position" },
+                    { kind: "first" as const, label: "First" },
+                    { kind: "last" as const, label: "Last" },
+                    { kind: "exact" as const, label: "Exact #" },
+                    { kind: "formula" as const, label: "Formula an+b" },
+                  ].map((option) => (
+                    <button
+                      key={option.kind}
+                      onClick={() =>
+                        setSelectorState((current) => ({
+                          ...current,
+                          series: {
+                            ...current.series,
+                            position: {
+                              ...current.series.position,
+                              kind: option.kind,
+                            },
+                          },
+                        }))
+                      }
+                      style={{
+                        border:
+                          selectorState.series.position.kind === option.kind
+                            ? "1px solid #17212b"
+                            : "1px solid rgb(134 145 160 / 42%)",
+                        borderRadius: 6,
+                        background:
+                          selectorState.series.position.kind === option.kind
+                            ? "#17212b"
+                            : "#ffffff",
+                        color:
+                          selectorState.series.position.kind === option.kind
+                            ? "#f8fafc"
+                            : "#17212b",
+                        cursor: "pointer",
+                        fontWeight: 700,
+                        minHeight: 30,
+                        padding: "0 10px",
+                      }}
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                {selectorState.series.position.kind === "exact" ? (
+                  <label style={numberFieldStyle}>
+                    <span>Child number</span>
+                    <input
+                      min={1}
+                      onChange={(event) => {
+                        const exact = Number(event.currentTarget.value) || 1;
+
+                        setSelectorState((current) => ({
+                          ...current,
+                          series: {
+                            ...current.series,
+                            position: {
+                              ...current.series.position,
+                              exact,
+                            },
+                          },
+                        }));
+                      }}
+                      style={numberInputStyle}
+                      type="number"
+                      value={selectorState.series.position.exact}
+                    />
+                  </label>
+                ) : null}
+                {selectorState.series.position.kind === "formula" ? (
+                  <div
+                    style={{
+                      alignItems: "center",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                    }}
+                  >
+                    <label style={numberFieldStyle}>
+                      <span>a</span>
+                      <input
+                        min={1}
+                        onChange={(event) => {
+                          const step = Number(event.currentTarget.value) || 1;
+
+                          setSelectorState((current) => ({
+                            ...current,
+                            series: {
+                              ...current.series,
+                              position: {
+                                ...current.series.position,
+                                step,
+                              },
+                            },
+                          }));
+                        }}
+                        style={numberInputStyle}
+                        type="number"
+                        value={selectorState.series.position.step}
+                      />
+                    </label>
+                    <span style={{ color: "#667085", fontWeight: 700 }}>n +</span>
+                    <label style={numberFieldStyle}>
+                      <span>b</span>
+                      <input
+                        min={0}
+                        onChange={(event) => {
+                          const offset = Number(event.currentTarget.value) || 0;
+
+                          setSelectorState((current) => ({
+                            ...current,
+                            series: {
+                              ...current.series,
+                              position: {
+                                ...current.series.position,
+                                offset,
+                              },
+                            },
+                          }));
+                        }}
+                        style={numberInputStyle}
+                        type="number"
+                        value={selectorState.series.position.offset}
+                      />
+                    </label>
+                    <span style={{ color: "#667085", fontSize: 12 }}>
+                      Example: {selectorState.series.position.step}n+
+                      {selectorState.series.position.offset}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </fieldset>
           )}
@@ -931,6 +1084,25 @@ const optionsGridStyle: React.CSSProperties = {
   display: "grid",
   gap: 8,
   gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+};
+
+const numberFieldStyle: React.CSSProperties = {
+  alignItems: "center",
+  color: "#17212b",
+  display: "inline-flex",
+  fontSize: 13,
+  fontWeight: 700,
+  gap: 8,
+};
+
+const numberInputStyle: React.CSSProperties = {
+  border: "1px solid rgb(134 145 160 / 42%)",
+  borderRadius: 6,
+  color: "#17212b",
+  font: "600 13px/1.4 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+  height: 30,
+  padding: "0 8px",
+  width: 74,
 };
 
 function SelectionPanelPortal({
@@ -983,7 +1155,12 @@ export function MacroPanel({ project }: MacroPanelProps) {
       tag: true,
       classes: [],
       attributes: [],
-      nth: false,
+      position: {
+        kind: "any",
+        exact: 1,
+        step: 2,
+        offset: 1,
+      },
     },
   });
   const selector = React.useMemo(() => {
