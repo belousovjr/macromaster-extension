@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import type { Root } from 'react-dom/client';
 
 import { MacroPanel } from '@/components/macro-panel';
+import { createTabMarker } from '@/lib/tab-marker';
 import {
   ACTIVE_PROJECT_ID_KEY,
   ACTIVE_PROJECT_TAB_ID_KEY,
@@ -22,6 +23,7 @@ export default defineContentScript({
   matches: ['<all_urls>'],
   cssInjectionMode: 'ui',
   async main(ctx) {
+    const tabMarker = createTabMarker();
     const ui = await createShadowRootUi(ctx, {
       name: 'macro-master-panel',
       position: 'overlay',
@@ -53,9 +55,11 @@ export default defineContentScript({
 
       if (!activeProject) {
         ui.remove();
+        tabMarker.disable();
         return;
       }
 
+      tabMarker.enable();
       ui.mount();
       ui.mounted?.render(activeProject);
     };
@@ -80,6 +84,7 @@ export default defineContentScript({
 
     ctx.onInvalidated(() => {
       browser.storage.onChanged.removeListener(handleStorageChange);
+      tabMarker.disable();
       ui.remove();
     });
   },
