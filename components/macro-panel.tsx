@@ -1411,14 +1411,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
                 isPickingElement && "bg-accent text-accent-foreground",
               )}
               onClick={() => {
-                setIsPickingElement((isPicking) => {
-                  const nextIsPicking = !isPicking;
-                  if (nextIsPicking) {
-                    hideSelectionPanel();
-                  }
-
-                  return nextIsPicking;
-                });
+                setIsPickingElement((isPicking) => !isPicking);
               }}
               onPointerDown={(event) => event.stopPropagation()}
               size="icon"
