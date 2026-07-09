@@ -1,8 +1,21 @@
-import * as React from "react";
-import { Crosshair, GripHorizontal, X } from "lucide-react";
+﻿import * as React from "react";
+import {
+  Crosshair,
+  GripHorizontal,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
@@ -19,7 +32,8 @@ const EDGE_GAP = 12;
 const PANEL_HOST_TAG = "macro-master-panel";
 const OVERLAY_ATTR = "data-macro-master-overlay";
 const PICKER_Z_INDEX = 2147483646;
-const SELECTION_PANEL_Z_INDEX = 2147483645;
+const PANEL_BACK_Z_INDEX = 2147483645;
+const PANEL_FRONT_Z_INDEX = 2147483647;
 const SELECTOR_HIGHLIGHT_Z_INDEX = 2147483644;
 
 type Bounds = {
@@ -42,6 +56,8 @@ type Interaction =
       pointerY: number;
       start: Bounds;
     };
+
+type FrontPanel = "floating" | "selection";
 
 type ElementDescription = {
   tag: string;
@@ -555,6 +571,25 @@ function useElementPicker(
   }, [isEnabled, onCancel, onPick]);
 }
 
+function usePickerPreview(element: Element | null) {
+  React.useEffect(() => {
+    if (!element) return;
+
+    const overlay = createPickerOverlay();
+    const update = () => overlay.update(element);
+
+    update();
+    window.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+
+    return () => {
+      window.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+      overlay.remove();
+    };
+  }, [element]);
+}
+
 function SelectorCheckbox({
   checked,
   disabled,
@@ -615,18 +650,24 @@ function SelectorRadio({
 }
 
 function SelectionBuilderPanel({
+  zIndex,
   matches,
+  onInteract,
   onClose,
   onConfirm,
+  onPickRelatedElement,
   pickedElement,
   selector,
   selectorState,
   setSelectorState,
   isPreviewPending,
 }: {
+  zIndex: number;
   matches: Element[];
+  onInteract: () => void;
   onClose: () => void;
   onConfirm: () => void;
+  onPickRelatedElement: (pickedElement: PickedElement) => void;
   pickedElement: PickedElement;
   selector: string | null;
   selectorState: SelectorState;
@@ -634,6 +675,42 @@ function SelectionBuilderPanel({
   isPreviewPending: boolean;
 }) {
   const element = pickedElement.element;
+  const [previewElement, setPreviewElement] = React.useState<Element | null>(
+    null,
+  );
+  const [navigationMenuOpen, setNavigationMenuOpen] = React.useState(false);
+  const [activeNavigationSub, setActiveNavigationSub] = React.useState<
+    "children" | null
+  >(null);
+  const setPreviewElementInTransition = (nextElement: Element | null) => {
+    React.startTransition(() => {
+      setPreviewElement(nextElement);
+    });
+  };
+  const parentOption = React.useMemo(() => {
+    const parent = element.parentElement;
+    if (
+      !parent ||
+      parent === document.body ||
+      parent === document.documentElement
+    ) {
+      return null;
+    }
+
+    return {
+      element: parent,
+      label: describeElement(parent).label,
+    };
+  }, [element]);
+  const childOptions = React.useMemo(
+    () =>
+      Array.from(element.children).map((child, index) => ({
+        element: child,
+        label: describeElement(child).label,
+        value: String(index),
+      })),
+    [element],
+  );
   const classOptions = React.useMemo(() => getClassOptions(element), [element]);
   const attributeOptions = React.useMemo(
     () => getAttributeOptions(element),
@@ -664,10 +741,19 @@ function SelectionBuilderPanel({
     ],
     [element],
   );
-  const isValid =
-    selectorState.mode === "single"
-      ? Boolean(selectorState.single)
-      : Boolean(selector);
+  const isSingleMode = selectorState.mode === "single";
+  const isValid = Boolean(selector);
+  usePickerPreview(previewElement);
+
+  const pickRelatedElement = (nextElement: Element) => {
+    setPreviewElementInTransition(null);
+    setNavigationMenuOpen(false);
+    setActiveNavigationSub(null);
+    onPickRelatedElement({
+      element: nextElement,
+      description: describeElement(nextElement),
+    });
+  };
 
   const setMode = (mode: SelectorMode) => {
     setSelectorState((current) => {
@@ -722,17 +808,19 @@ function SelectionBuilderPanel({
   return (
     <div
       className="macro-master-root fixed inset-x-0 bottom-0 box-border flex justify-center px-3 pb-3"
-      style={{ zIndex: SELECTION_PANEL_Z_INDEX, pointerEvents: "none" }}
+      style={{ zIndex, pointerEvents: "none" }}
     >
       <section
         className="macro-master-panel w-full max-w-[820px] overflow-auto rounded-lg border border-border bg-card text-card-foreground"
+        onFocusCapture={onInteract}
+        onPointerDownCapture={onInteract}
         style={{
           maxHeight: "min(420px, calc(100vh - 24px))",
           pointerEvents: "auto",
         }}
       >
         <header className="flex items-center justify-between gap-3 border-b border-border px-3 py-2.5">
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold">
               <span className="text-primary">
                 {pickedElement.description.tag}
@@ -747,16 +835,93 @@ function SelectionBuilderPanel({
               {isPreviewPending ? ", updating" : ""}
             </div>
           </div>
-          <Button
-            aria-label="Close selector panel"
-            className="size-7 text-muted-foreground hover:text-foreground"
-            onClick={onClose}
-            size="icon"
-            type="button"
-            variant="ghost"
-          >
-            <X className="size-4" aria-hidden="true" />
-          </Button>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            {isSingleMode &&
+            (parentOption || childOptions.length > 0) ? (
+              <DropdownMenu
+                modal={false}
+                open={navigationMenuOpen}
+                onOpenChange={(isOpen) => {
+                  setNavigationMenuOpen(isOpen);
+                  if (!isOpen) {
+                    setPreviewElementInTransition(null);
+                    setActiveNavigationSub(null);
+                  }
+                }}
+              >
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    aria-label="Open element navigation menu"
+                    className="size-8 shrink-0"
+                    size="icon"
+                    type="button"
+                    variant="outline"
+                  >
+                    <Crosshair className="size-4" aria-hidden="true" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {parentOption ? (
+                    <DropdownMenuItem
+                      onFocus={() =>
+                        setPreviewElementInTransition(parentOption.element)
+                      }
+                      onPointerLeave={() => setPreviewElementInTransition(null)}
+                      onPointerMove={() =>
+                        setPreviewElementInTransition(parentOption.element)
+                      }
+                      onSelect={() => pickRelatedElement(parentOption.element)}
+                    >
+                      <span className="min-w-0 truncate">
+                        Родитель: {parentOption.label}
+                      </span>
+                    </DropdownMenuItem>
+                  ) : null}
+                  {childOptions.length > 0 ? (
+                    <DropdownMenuSub
+                      open={activeNavigationSub === "children"}
+                      onOpenChange={(isOpen) =>
+                        setActiveNavigationSub(isOpen ? "children" : null)
+                      }
+                    >
+                      <DropdownMenuSubTrigger>Дети</DropdownMenuSubTrigger>
+                      <DropdownMenuSubContent className="max-h-72 w-72 overflow-y-auto">
+                        {childOptions.map((child) => (
+                          <DropdownMenuItem
+                            key={child.value}
+                            onFocus={() =>
+                              setPreviewElementInTransition(child.element)
+                            }
+                            onPointerLeave={() =>
+                              setPreviewElementInTransition(null)
+                            }
+                            onPointerMove={() =>
+                              setPreviewElementInTransition(child.element)
+                            }
+                            onSelect={() => pickRelatedElement(child.element)}
+                          >
+                            <span className="min-w-0 truncate">
+                              {child.label}
+                            </span>
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuSubContent>
+                    </DropdownMenuSub>
+                  ) : null}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+            <Button
+              aria-label="Close selector panel"
+              className="size-7 text-muted-foreground hover:text-foreground"
+              onClick={onClose}
+              size="icon"
+              type="button"
+              variant="ghost"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </Button>
+          </div>
         </header>
 
         <div className="grid gap-3 p-3">
@@ -980,6 +1145,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
   );
   const [isSelectionPanelVisible, setIsSelectionPanelVisible] =
     React.useState(false);
+  const [frontPanel, setFrontPanel] = React.useState<FrontPanel>("floating");
   const [selectorState, setSelectorState] = React.useState<SelectorState>({
     mode: "series",
     single: null,
@@ -1015,25 +1181,56 @@ export function MacroPanel({ project }: MacroPanelProps) {
     [previewSelector],
   );
   const isPreviewPending = selector !== previewSelector;
+  const floatingPanelZIndex =
+    frontPanel === "floating" ? PANEL_FRONT_Z_INDEX : PANEL_BACK_Z_INDEX;
+  const selectionPanelZIndex =
+    frontPanel === "selection" ? PANEL_FRONT_Z_INDEX : PANEL_BACK_Z_INDEX;
+
+  const bringFloatingPanelToFront = React.useCallback(() => {
+    setFrontPanel("floating");
+  }, []);
+
+  const bringSelectionPanelToFront = React.useCallback(() => {
+    setFrontPanel("selection");
+  }, []);
 
   const stopPickingElement = React.useCallback(() => {
     setIsPickingElement(false);
   }, []);
 
-  const closeSelectionPanel = React.useCallback(() => {
-    setIsSelectionPanelVisible(false);
+  const hideSelectionPanel = React.useCallback(() => {
+    React.startTransition(() => {
+      setIsSelectionPanelVisible(false);
+    });
   }, []);
+
+  const closeSelectionPanel = hideSelectionPanel;
 
   const confirmSelection = React.useCallback(() => {
-    setIsSelectionPanelVisible(false);
-  }, []);
+    hideSelectionPanel();
+  }, [hideSelectionPanel]);
 
   const handlePickElement = React.useCallback((nextElement: PickedElement) => {
-    setPickedElement(nextElement);
-    setSelectorState(getInitialSelectorState(nextElement.element));
     setIsPickingElement(false);
-    setIsSelectionPanelVisible(true);
+    React.startTransition(() => {
+      setPickedElement(nextElement);
+      setSelectorState(getInitialSelectorState(nextElement.element));
+      setFrontPanel("selection");
+      setIsSelectionPanelVisible(true);
+    });
   }, []);
+
+  const handlePickRelatedElement = React.useCallback(
+    (nextElement: PickedElement) => {
+      setIsPickingElement(false);
+      React.startTransition(() => {
+        setPickedElement(nextElement);
+        setFrontPanel("selection");
+        setIsSelectionPanelVisible(true);
+      });
+    },
+    [],
+  );
 
   useElementPicker(isPickingElement, handlePickElement, stopPickingElement);
   useSelectorHighlights(
@@ -1123,11 +1320,14 @@ export function MacroPanel({ project }: MacroPanelProps) {
   return (
     <>
       <div
-        className="macro-master-root fixed left-0 top-0 z-[2147483647]"
+        className="macro-master-root fixed left-0 top-0"
+        onFocusCapture={bringFloatingPanelToFront}
+        onPointerDownCapture={bringFloatingPanelToFront}
         style={{
           transform: `translate3d(${bounds.x}px, ${bounds.y}px, 0)`,
           width: bounds.width,
           height: bounds.height,
+          zIndex: floatingPanelZIndex,
         }}
       >
         <section
@@ -1160,7 +1360,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
                 setIsPickingElement((isPicking) => {
                   const nextIsPicking = !isPicking;
                   if (nextIsPicking) {
-                    setIsSelectionPanelVisible(false);
+                    hideSelectionPanel();
                   }
 
                   return nextIsPicking;
@@ -1212,9 +1412,12 @@ export function MacroPanel({ project }: MacroPanelProps) {
       </div>
       {isSelectionPanelVisible && pickedElement ? (
         <SelectionBuilderPanel
+          zIndex={selectionPanelZIndex}
           matches={matches}
+          onInteract={bringSelectionPanelToFront}
           onClose={closeSelectionPanel}
           onConfirm={confirmSelection}
+          onPickRelatedElement={handlePickRelatedElement}
           pickedElement={pickedElement}
           selector={selector}
           selectorState={selectorState}
@@ -1225,3 +1428,4 @@ export function MacroPanel({ project }: MacroPanelProps) {
     </>
   );
 }
+
