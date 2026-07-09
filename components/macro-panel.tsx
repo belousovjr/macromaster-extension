@@ -617,17 +617,21 @@ function SelectorRadio({
 function SelectionBuilderPanel({
   matches,
   onClose,
+  onConfirm,
   pickedElement,
   selector,
   selectorState,
   setSelectorState,
+  isPreviewPending,
 }: {
   matches: Element[];
   onClose: () => void;
+  onConfirm: () => void;
   pickedElement: PickedElement;
   selector: string | null;
   selectorState: SelectorState;
   setSelectorState: React.Dispatch<React.SetStateAction<SelectorState>>;
+  isPreviewPending: boolean;
 }) {
   const element = pickedElement.element;
   const classOptions = React.useMemo(() => getClassOptions(element), [element]);
@@ -740,6 +744,7 @@ function SelectionBuilderPanel({
             <div className="truncate text-xs text-muted-foreground">
               {selector ?? "Choose at least one selector"} - {matches.length}{" "}
               match{matches.length === 1 ? "" : "es"}
+              {isPreviewPending ? ", updating" : ""}
             </div>
           </div>
           <Button
@@ -754,150 +759,125 @@ function SelectionBuilderPanel({
           </Button>
         </header>
 
-        <Tabs
-          className="gap-3 p-3"
-          onValueChange={(value) => setMode(value as SelectorMode)}
-          value={selectorState.mode}
-        >
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="single">Single element</TabsTrigger>
-            <TabsTrigger value="series">Series</TabsTrigger>
-          </TabsList>
+        <div className="grid gap-3 p-3">
+          <Tabs
+            className="gap-3"
+            onValueChange={(value) => setMode(value as SelectorMode)}
+            value={selectorState.mode}
+          >
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="single">Single element</TabsTrigger>
+              <TabsTrigger value="series">Series</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="single">
-            <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
-              <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                Static single selectors
-              </legend>
-              <RadioGroup
-                className="grid gap-1 sm:grid-cols-2"
-                onValueChange={(value) =>
-                  setSelectorState((current) => ({
-                    ...current,
-                    single: value as SingleSelectorKind,
-                  }))
-                }
-                value={selectorState.single ?? ""}
-              >
-                {singleOptions.map((option) => (
-                  <SelectorRadio
-                    disabled={option.disabled}
-                    key={option.kind}
-                    label={option.label}
-                    value={option.kind}
-                  />
-                ))}
-              </RadioGroup>
-            </fieldset>
-          </TabsContent>
-
-          <TabsContent value="series">
-            <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
-              <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                Series selectors
-              </legend>
-              <div className="grid gap-1 sm:grid-cols-2">
-                <SelectorCheckbox
-                  checked={selectorState.series.tag}
-                  label={`tag <${element.tagName.toLowerCase()}>`}
-                  onChange={(checked) =>
-                    setSelectorState((current) => ({
-                      ...current,
-                      series: { ...current.series, tag: checked },
-                    }))
-                  }
-                />
-                {classOptions.map((option) => (
-                  <SelectorCheckbox
-                    checked={selectorState.series.classes.includes(
-                      option.value,
-                    )}
-                    key={option.value}
-                    label={option.label}
-                    onChange={(checked) => toggleClass(option.value, checked)}
-                  />
-                ))}
-                {attributeOptions.map((option) => (
-                  <SelectorCheckbox
-                    checked={selectorState.series.attributes.includes(
-                      option.value,
-                    )}
-                    key={option.value}
-                    label={option.label}
-                    onChange={(checked) =>
-                      toggleAttribute(option.value, checked)
-                    }
-                  />
-                ))}
-              </div>
-              <div className="mt-3 grid gap-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                  Position pattern
-                </div>
+            <TabsContent value="single">
+              <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
+                <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  Static single selectors
+                </legend>
                 <RadioGroup
                   className="grid gap-1 sm:grid-cols-2"
                   onValueChange={(value) =>
                     setSelectorState((current) => ({
                       ...current,
-                      series: {
-                        ...current.series,
-                        position: {
-                          ...current.series.position,
-                          kind: value as SeriesPositionKind,
-                        },
-                      },
+                      single: value as SingleSelectorKind,
                     }))
                   }
-                  value={selectorState.series.position.kind}
+                  value={selectorState.single ?? ""}
                 >
-                  {[
-                    { kind: "any" as const, label: "Any position" },
-                    { kind: "first" as const, label: "First" },
-                    { kind: "last" as const, label: "Last" },
-                    { kind: "exact" as const, label: "Exact #" },
-                    { kind: "formula" as const, label: "Formula an+b" },
-                  ].map((option) => (
+                  {singleOptions.map((option) => (
                     <SelectorRadio
+                      disabled={option.disabled}
                       key={option.kind}
                       label={option.label}
                       value={option.kind}
                     />
                   ))}
                 </RadioGroup>
-                {selectorState.series.position.kind === "exact" ? (
-                  <label className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-                    <span>Child number</span>
-                    <Input
-                      className="h-8 w-20"
-                      min={1}
-                      onChange={(event) => {
-                        const exact = Number(event.currentTarget.value) || 1;
+              </fieldset>
+            </TabsContent>
 
-                        setSelectorState((current) => ({
-                          ...current,
-                          series: {
-                            ...current.series,
-                            position: {
-                              ...current.series.position,
-                              exact,
-                            },
-                          },
-                        }));
-                      }}
-                      type="number"
-                      value={selectorState.series.position.exact}
+            <TabsContent value="series">
+              <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
+                <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  Series selectors
+                </legend>
+                <div className="grid gap-1 sm:grid-cols-2">
+                  <SelectorCheckbox
+                    checked={selectorState.series.tag}
+                    label={`tag <${element.tagName.toLowerCase()}>`}
+                    onChange={(checked) =>
+                      setSelectorState((current) => ({
+                        ...current,
+                        series: { ...current.series, tag: checked },
+                      }))
+                    }
+                  />
+                  {classOptions.map((option) => (
+                    <SelectorCheckbox
+                      checked={selectorState.series.classes.includes(
+                        option.value,
+                      )}
+                      key={option.value}
+                      label={option.label}
+                      onChange={(checked) => toggleClass(option.value, checked)}
                     />
-                  </label>
-                ) : null}
-                {selectorState.series.position.kind === "formula" ? (
-                  <div className="flex flex-wrap items-center gap-2">
-                    <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <span>a</span>
+                  ))}
+                  {attributeOptions.map((option) => (
+                    <SelectorCheckbox
+                      checked={selectorState.series.attributes.includes(
+                        option.value,
+                      )}
+                      key={option.value}
+                      label={option.label}
+                      onChange={(checked) =>
+                        toggleAttribute(option.value, checked)
+                      }
+                    />
+                  ))}
+                </div>
+                <div className="mt-3 grid gap-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                    Position pattern
+                  </div>
+                  <RadioGroup
+                    className="grid gap-1 sm:grid-cols-2"
+                    onValueChange={(value) =>
+                      setSelectorState((current) => ({
+                        ...current,
+                        series: {
+                          ...current.series,
+                          position: {
+                            ...current.series.position,
+                            kind: value as SeriesPositionKind,
+                          },
+                        },
+                      }))
+                    }
+                    value={selectorState.series.position.kind}
+                  >
+                    {[
+                      { kind: "any" as const, label: "Any position" },
+                      { kind: "first" as const, label: "First" },
+                      { kind: "last" as const, label: "Last" },
+                      { kind: "exact" as const, label: "Exact #" },
+                      { kind: "formula" as const, label: "Formula an+b" },
+                    ].map((option) => (
+                      <SelectorRadio
+                        key={option.kind}
+                        label={option.label}
+                        value={option.kind}
+                      />
+                    ))}
+                  </RadioGroup>
+                  {selectorState.series.position.kind === "exact" ? (
+                    <label className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                      <span>Child number</span>
                       <Input
                         className="h-8 w-20"
                         min={1}
                         onChange={(event) => {
-                          const step = Number(event.currentTarget.value) || 1;
+                          const exact = Number(event.currentTarget.value) || 1;
 
                           setSelectorState((current) => ({
                             ...current,
@@ -905,59 +885,85 @@ function SelectionBuilderPanel({
                               ...current.series,
                               position: {
                                 ...current.series.position,
-                                step,
+                                exact,
                               },
                             },
                           }));
                         }}
                         type="number"
-                        value={selectorState.series.position.step}
+                        value={selectorState.series.position.exact}
                       />
                     </label>
-                    <span className="text-sm font-bold text-muted-foreground">
-                      n +
-                    </span>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <span>b</span>
-                      <Input
-                        className="h-8 w-20"
-                        min={0}
-                        onChange={(event) => {
-                          const offset = Number(event.currentTarget.value) || 0;
+                  ) : null}
+                  {selectorState.series.position.kind === "formula" ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <span>a</span>
+                        <Input
+                          className="h-8 w-20"
+                          min={1}
+                          onChange={(event) => {
+                            const step = Number(event.currentTarget.value) || 1;
 
-                          setSelectorState((current) => ({
-                            ...current,
-                            series: {
-                              ...current.series,
-                              position: {
-                                ...current.series.position,
-                                offset,
+                            setSelectorState((current) => ({
+                              ...current,
+                              series: {
+                                ...current.series,
+                                position: {
+                                  ...current.series.position,
+                                  step,
+                                },
                               },
-                            },
-                          }));
-                        }}
-                        type="number"
-                        value={selectorState.series.position.offset}
-                      />
-                    </label>
-                    <span className="text-xs text-muted-foreground">
-                      Example: {selectorState.series.position.step}n+
-                      {selectorState.series.position.offset}
-                    </span>
-                  </div>
-                ) : null}
-              </div>
-            </fieldset>
-          </TabsContent>
+                            }));
+                          }}
+                          type="number"
+                          value={selectorState.series.position.step}
+                        />
+                      </label>
+                      <span className="text-sm font-bold text-muted-foreground">
+                        n +
+                      </span>
+                      <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <span>b</span>
+                        <Input
+                          className="h-8 w-20"
+                          min={0}
+                          onChange={(event) => {
+                            const offset =
+                              Number(event.currentTarget.value) || 0;
 
-          {!isValid ? (
-            <p className="m-0 text-xs text-amber-700">
-              {selectorState.mode === "single"
-                ? "Choose at least one static selector."
-                : "Choose at least one series selector."}
-            </p>
-          ) : null}
-        </Tabs>
+                            setSelectorState((current) => ({
+                              ...current,
+                              series: {
+                                ...current.series,
+                                position: {
+                                  ...current.series.position,
+                                  offset,
+                                },
+                              },
+                            }));
+                          }}
+                          type="number"
+                          value={selectorState.series.position.offset}
+                        />
+                      </label>
+                      <span className="text-xs text-muted-foreground">
+                        Example: {selectorState.series.position.step}n+
+                        {selectorState.series.position.offset}
+                      </span>
+                    </div>
+                  ) : null}
+                </div>
+              </fieldset>
+            </TabsContent>
+          </Tabs>
+
+          <footer className="flex justify-end border-t border-border pt-3">
+            <Button disabled={!isValid} onClick={onConfirm} type="button">
+              Confirm
+            </Button>
+          </footer>
+        </div>
       </section>
     </div>
   );
@@ -996,13 +1002,29 @@ export function MacroPanel({ project }: MacroPanelProps) {
       ? buildSingleSelector(pickedElement.element, selectorState.single)
       : buildSeriesSelector(pickedElement.element, selectorState.series);
   }, [pickedElement, selectorState]);
-  const matches = React.useMemo(() => getSelectorMatches(selector), [selector]);
+  const deferredSelectorState = React.useDeferredValue(selectorState);
+  const previewSelector = React.useMemo(() => {
+    if (!pickedElement) return null;
+
+    return deferredSelectorState.mode === "single"
+      ? buildSingleSelector(pickedElement.element, deferredSelectorState.single)
+      : buildSeriesSelector(pickedElement.element, deferredSelectorState.series);
+  }, [deferredSelectorState, pickedElement]);
+  const matches = React.useMemo(
+    () => getSelectorMatches(previewSelector),
+    [previewSelector],
+  );
+  const isPreviewPending = selector !== previewSelector;
 
   const stopPickingElement = React.useCallback(() => {
     setIsPickingElement(false);
   }, []);
 
   const closeSelectionPanel = React.useCallback(() => {
+    setIsSelectionPanelVisible(false);
+  }, []);
+
+  const confirmSelection = React.useCallback(() => {
     setIsSelectionPanelVisible(false);
   }, []);
 
@@ -1016,8 +1038,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
   useElementPicker(isPickingElement, handlePickElement, stopPickingElement);
   useSelectorHighlights(
     matches,
-    selectorState.mode === "series",
-    isSelectionPanelVisible && Boolean(selector),
+    deferredSelectorState.mode === "series",
+    isSelectionPanelVisible && Boolean(previewSelector),
   );
 
   React.useEffect(() => {
@@ -1192,10 +1214,12 @@ export function MacroPanel({ project }: MacroPanelProps) {
         <SelectionBuilderPanel
           matches={matches}
           onClose={closeSelectionPanel}
+          onConfirm={confirmSelection}
           pickedElement={pickedElement}
           selector={selector}
           selectorState={selectorState}
           setSelectorState={setSelectorState}
+          isPreviewPending={isPreviewPending}
         />
       ) : null}
     </>
