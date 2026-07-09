@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import { MacroPanel } from '@/components/macro-panel';
+import { getPanelEnabled, PANEL_VISIBILITY_KEY } from '@/lib/panel-visibility';
 import '@/styles/content.css';
 
 export default defineContentScript({
@@ -28,6 +29,31 @@ export default defineContentScript({
       },
     });
 
-    ui.mount();
+    if (await getPanelEnabled()) {
+      ui.mount();
+    }
+
+    const handleStorageChange: Parameters<
+      typeof browser.storage.onChanged.addListener
+    >[0] = (changes, areaName) => {
+      if (areaName !== 'local') return;
+
+      const panelChange = changes[PANEL_VISIBILITY_KEY];
+      if (!panelChange) return;
+
+      if ((panelChange.newValue as boolean | undefined) ?? true) {
+        ui.mount();
+        return;
+      }
+
+      ui.remove();
+    };
+
+    browser.storage.onChanged.addListener(handleStorageChange);
+
+    ctx.onInvalidated(() => {
+      browser.storage.onChanged.removeListener(handleStorageChange);
+      ui.remove();
+    });
   },
 });
