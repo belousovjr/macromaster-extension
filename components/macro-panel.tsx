@@ -1,5 +1,5 @@
 import * as React from "react";
-import { GripHorizontal, X } from "lucide-react";
+import { Crosshair, GripHorizontal, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { closeActiveProject, type MacroProject } from "@/lib/projects";
@@ -11,6 +11,8 @@ const MAX_WIDTH = 560;
 const MIN_HEIGHT = 220;
 const MAX_HEIGHT = 720;
 const EDGE_GAP = 12;
+const PANEL_HOST_TAG = "macro-master-panel";
+const PICKER_Z_INDEX = 2147483646;
 
 type Bounds = {
   x: number;
@@ -32,6 +34,16 @@ type Interaction =
       pointerY: number;
       start: Bounds;
     };
+
+type PickedElement = {
+  label: string;
+};
+
+type ElementDescription = {
+  tag: string;
+  details: string;
+  label: string;
+};
 
 function getDefaultBounds(): Bounds {
   const width = 360;
@@ -85,6 +97,191 @@ function clampBounds(bounds: Bounds): Bounds {
   };
 }
 
+function describeElement(element: Element): ElementDescription {
+  const tag = element.tagName.toLowerCase();
+  const id = element.id ? `#${element.id}` : "";
+  const classes =
+    element instanceof HTMLElement && element.classList.length > 0
+      ? `.${Array.from(element.classList).slice(0, 2).join(".")}`
+      : "";
+  const rect = element.getBoundingClientRect();
+  const size = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+  const details = `${id}${classes} ${size}`.trim();
+
+  return {
+    tag,
+    details,
+    label: `${tag}${details ? details : ""}`,
+  };
+}
+
+function isPanelEvent(event: Event) {
+  return event
+    .composedPath()
+    .some(
+      (node) =>
+        node instanceof HTMLElement &&
+        node.localName.toLowerCase() === PANEL_HOST_TAG,
+    );
+}
+
+function getPickableElement(event: PointerEvent) {
+  if (isPanelEvent(event)) return null;
+
+  const element = document.elementFromPoint(event.clientX, event.clientY);
+  if (!(element instanceof Element)) return null;
+  if (element.closest(PANEL_HOST_TAG)) return null;
+  if (element === document.documentElement || element === document.body) {
+    return null;
+  }
+
+  return element;
+}
+
+function createPickerOverlay() {
+  const overlay = document.createElement("div");
+  const label = document.createElement("div");
+
+  overlay.style.cssText = [
+    "position: fixed",
+    "display: none",
+    "pointer-events: none",
+    "border: 2px solid #2563eb",
+    "background: rgb(37 99 235 / 10%)",
+    `z-index: ${PICKER_Z_INDEX}`,
+    "box-sizing: border-box",
+  ].join(";");
+  label.style.cssText = [
+    "position: fixed",
+    "display: none",
+    "pointer-events: none",
+    "max-width: min(360px, calc(100vw - 16px))",
+    "overflow: hidden",
+    "text-overflow: ellipsis",
+    "white-space: nowrap",
+    "border-radius: 4px",
+    "background: #17212b",
+    "color: #f8fafc",
+    "font: 500 12px/1.4 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "padding: 3px 7px",
+    `z-index: ${PICKER_Z_INDEX}`,
+    "box-shadow: 0 6px 18px rgb(15 23 42 / 24%)",
+  ].join(";");
+
+  document.documentElement.append(overlay, label);
+
+  return {
+    update(element: Element | null) {
+      if (!element) {
+        overlay.style.display = "none";
+        label.style.display = "none";
+        label.replaceChildren();
+        return;
+      }
+
+      const rect = element.getBoundingClientRect();
+      const info = describeElement(element);
+      const tag = document.createElement("span");
+      const details = document.createElement("span");
+      const labelTop =
+        rect.top >= 28
+          ? Math.max(4, rect.top - 26)
+          : Math.min(window.innerHeight - 24, rect.bottom + 4);
+      const labelLeft = Math.min(
+        Math.max(4, rect.left),
+        Math.max(4, window.innerWidth - 368),
+      );
+
+      overlay.style.display = "block";
+      overlay.style.left = `${rect.left}px`;
+      overlay.style.top = `${rect.top}px`;
+      overlay.style.width = `${rect.width}px`;
+      overlay.style.height = `${rect.height}px`;
+      label.style.display = "block";
+      label.style.left = `${labelLeft}px`;
+      label.style.top = `${labelTop}px`;
+      tag.textContent = info.tag;
+      tag.style.cssText = "color: #93c5fd; font-weight: 700;";
+      details.textContent = info.details ? info.details : "";
+      details.style.cssText = "color: #f8fafc;";
+      label.replaceChildren(tag, details);
+    },
+    remove() {
+      overlay.remove();
+      label.remove();
+    },
+  };
+}
+
+function useElementPicker(
+  isEnabled: boolean,
+  onPick: (pickedElement: PickedElement) => void,
+  onCancel: () => void,
+) {
+  React.useEffect(() => {
+    if (!isEnabled) return;
+
+    const overlay = createPickerOverlay();
+    const cursorStyle = document.createElement("style");
+    const previousBodyCursor = document.body.style.cursor;
+    const previousDocumentCursor = document.documentElement.style.cursor;
+
+    cursorStyle.textContent = `*:not(${PANEL_HOST_TAG}):not(${PANEL_HOST_TAG} *) { cursor: crosshair !important; }`;
+    document.head.append(cursorStyle);
+    document.body.style.cursor = "crosshair";
+    document.documentElement.style.cursor = "crosshair";
+
+    const handlePointerMove = (event: PointerEvent) => {
+      overlay.update(getPickableElement(event));
+    };
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!getPickableElement(event)) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+    };
+
+    const handleClick = (event: MouseEvent) => {
+      if (isPanelEvent(event)) return;
+
+      const element = document.elementFromPoint(event.clientX, event.clientY);
+      if (!(element instanceof Element)) return;
+      if (element.closest(PANEL_HOST_TAG)) return;
+      if (element === document.documentElement || element === document.body) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      onPick({ label: describeElement(element).label });
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+
+      event.preventDefault();
+      onCancel();
+    };
+
+    window.addEventListener("pointermove", handlePointerMove, true);
+    window.addEventListener("pointerdown", handlePointerDown, true);
+    window.addEventListener("click", handleClick, true);
+    window.addEventListener("keydown", handleKeyDown, true);
+
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove, true);
+      window.removeEventListener("pointerdown", handlePointerDown, true);
+      window.removeEventListener("click", handleClick, true);
+      window.removeEventListener("keydown", handleKeyDown, true);
+      document.body.style.cursor = previousBodyCursor;
+      document.documentElement.style.cursor = previousDocumentCursor;
+      cursorStyle.remove();
+      overlay.remove();
+    };
+  }, [isEnabled, onCancel, onPick]);
+}
+
 type MacroPanelProps = {
   project: MacroProject;
 };
@@ -94,6 +291,21 @@ export function MacroPanel({ project }: MacroPanelProps) {
   const [interaction, setInteraction] = React.useState<Interaction | null>(
     null,
   );
+  const [isPickingElement, setIsPickingElement] = React.useState(false);
+  const [pickedElement, setPickedElement] = React.useState<PickedElement | null>(
+    null,
+  );
+
+  const stopPickingElement = React.useCallback(() => {
+    setIsPickingElement(false);
+  }, []);
+
+  const handlePickElement = React.useCallback((nextElement: PickedElement) => {
+    setPickedElement(nextElement);
+    setIsPickingElement(false);
+  }, []);
+
+  useElementPicker(isPickingElement, handlePickElement, stopPickingElement);
 
   React.useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(bounds));
@@ -202,6 +414,22 @@ export function MacroPanel({ project }: MacroPanelProps) {
             </div>
           </div>
           <Button
+            aria-label="Select element on page"
+            aria-pressed={isPickingElement}
+            className={cn(
+              "size-7 text-muted-foreground hover:text-foreground",
+              isPickingElement && "bg-accent text-accent-foreground",
+            )}
+            onClick={() => setIsPickingElement((isPicking) => !isPicking)}
+            onPointerDown={(event) => event.stopPropagation()}
+            size="icon"
+            title="Select element"
+            type="button"
+            variant="ghost"
+          >
+            <Crosshair className="size-4" aria-hidden="true" />
+          </Button>
+          <Button
             aria-label="Close project"
             className="size-7 text-muted-foreground hover:text-foreground"
             onClick={() => void closeActiveProject()}
@@ -216,9 +444,15 @@ export function MacroPanel({ project }: MacroPanelProps) {
 
         <main className="flex flex-1 flex-col items-center justify-center gap-2 bg-card px-6 py-8 text-center">
           <p className="text-sm font-medium text-foreground">Hello world</p>
-          <p className="max-w-full truncate text-xs text-muted-foreground">
-            {project.id}
-          </p>
+          {pickedElement ? (
+            <p className="max-w-full truncate text-xs text-muted-foreground">
+              Selected: {pickedElement.label}
+            </p>
+          ) : (
+            <p className="max-w-full truncate text-xs text-muted-foreground">
+              {isPickingElement ? "Hover and click an element" : project.id}
+            </p>
+          )}
         </main>
 
         <button
