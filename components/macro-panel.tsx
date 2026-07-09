@@ -1,12 +1,20 @@
 ﻿import * as React from "react";
 import {
+  Clipboard,
   Crosshair,
   GripHorizontal,
+  MousePointerClick,
   X,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,6 +76,13 @@ type ElementDescription = {
 type PickedElement = {
   element: Element;
   description: ElementDescription;
+};
+
+type PickerContextMenuState = {
+  x: number;
+  y: number;
+  pickedElement: PickedElement;
+  selector: string;
 };
 
 type SelectorMode = "single" | "series";
@@ -382,7 +397,7 @@ function isPanelEvent(event: Event) {
     );
 }
 
-function getPickableElement(event: PointerEvent) {
+function getPickableElement(event: MouseEvent | PointerEvent) {
   if (isPanelEvent(event)) return null;
 
   const element = document.elementFromPoint(event.clientX, event.clientY);
@@ -507,6 +522,7 @@ function useElementPicker(
   isEnabled: boolean,
   onPick: (pickedElement: PickedElement) => void,
   onCancel: () => void,
+  onContextMenu: (state: PickerContextMenuState) => void,
 ) {
   React.useEffect(() => {
     if (!isEnabled) return;
@@ -533,21 +549,37 @@ function useElementPicker(
       event.stopImmediatePropagation();
     };
 
-    const handleClick = (event: MouseEvent) => {
+    const pickElementAtEvent = (event: MouseEvent) => {
       if (isPanelEvent(event)) return;
 
-      const element = document.elementFromPoint(event.clientX, event.clientY);
-      if (!(element instanceof Element)) return;
-      if (element.closest(PANEL_HOST_TAG)) return;
-      if (element.closest(`[${OVERLAY_ATTR}]`)) return;
-      if (element === document.documentElement || element === document.body) {
-        return;
-      }
+      const element = getPickableElement(event);
+      if (!element) return;
 
       event.preventDefault();
       event.stopPropagation();
       event.stopImmediatePropagation();
       onPick({ element, description: describeElement(element) });
+    };
+
+    const handleClick = (event: MouseEvent) => {
+      if (event.button !== 0) return;
+
+      pickElementAtEvent(event);
+    };
+
+    const handleContextMenu = (event: MouseEvent) => {
+      const element = getPickableElement(event);
+      if (!element) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      onContextMenu({
+        x: event.clientX,
+        y: event.clientY,
+        pickedElement: { element, description: describeElement(element) },
+        selector: getElementPath(element),
+      });
     };
 
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -560,19 +592,21 @@ function useElementPicker(
     window.addEventListener("pointermove", handlePointerMove, true);
     window.addEventListener("pointerdown", handlePointerDown, true);
     window.addEventListener("click", handleClick, true);
+    window.addEventListener("contextmenu", handleContextMenu, true);
     window.addEventListener("keydown", handleKeyDown, true);
 
     return () => {
       window.removeEventListener("pointermove", handlePointerMove, true);
       window.removeEventListener("pointerdown", handlePointerDown, true);
       window.removeEventListener("click", handleClick, true);
+      window.removeEventListener("contextmenu", handleContextMenu, true);
       window.removeEventListener("keydown", handleKeyDown, true);
       document.body.style.cursor = previousBodyCursor;
       document.documentElement.style.cursor = previousDocumentCursor;
       cursorStyle.remove();
       overlay.remove();
     };
-  }, [isEnabled, onCancel, onPick]);
+  }, [isEnabled, onCancel, onContextMenu, onPick]);
 }
 
 function usePickerPreview(element: Element | null) {
@@ -592,6 +626,99 @@ function usePickerPreview(element: Element | null) {
       overlay.remove();
     };
   }, [element]);
+}
+
+async function copyTextToClipboard(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    const textArea = document.createElement("textarea");
+
+    textArea.value = text;
+    textArea.style.cssText = [
+      "position: fixed",
+      "left: -9999px",
+      "top: 0",
+      "opacity: 0",
+    ].join(";");
+    document.documentElement.append(textArea);
+    textArea.focus();
+    textArea.select();
+
+    try {
+      document.execCommand("copy");
+    } finally {
+      textArea.remove();
+    }
+  }
+}
+
+function PickerContextMenu({
+  state,
+  onCopySelector,
+  onOpenChange,
+  onSelectElement,
+}: {
+  state: PickerContextMenuState | null;
+  onCopySelector: (selector: string) => void;
+  onOpenChange: (isOpen: boolean) => void;
+  onSelectElement: (pickedElement: PickedElement) => void;
+}) {
+  const triggerRef = React.useRef<HTMLSpanElement>(null);
+
+  React.useEffect(() => {
+    if (!state) return;
+
+    triggerRef.current?.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        clientX: state.x,
+        clientY: state.y,
+        view: window,
+      }),
+    );
+  }, [state]);
+
+  return (
+    <ContextMenu modal={false} onOpenChange={onOpenChange}>
+      <ContextMenuTrigger
+        ref={triggerRef}
+        className="fixed size-px opacity-0"
+        style={{
+          left: state?.x ?? 0,
+          top: state?.y ?? 0,
+          pointerEvents: "none",
+        }}
+      />
+      <ContextMenuContent
+        className="pointer-events-auto w-44"
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
+        <ContextMenuItem
+          onSelect={() => {
+            if (!state) return;
+
+            onSelectElement(state.pickedElement);
+          }}
+        >
+          <MousePointerClick className="size-4" aria-hidden="true" />
+          <span>Выбрать</span>
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => {
+            if (!state) return;
+
+            onCopySelector(state.selector);
+          }}
+        >
+          <Clipboard className="size-4" aria-hidden="true" />
+          <span>Скопировать</span>
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
+  );
 }
 
 function SelectorCheckbox({
@@ -1172,6 +1299,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
   const [pickedElement, setPickedElement] = React.useState<PickedElement | null>(
     null,
   );
+  const [pickerContextMenu, setPickerContextMenu] =
+    React.useState<PickerContextMenuState | null>(null);
   const [isSelectionPanelVisible, setIsSelectionPanelVisible] =
     React.useState(false);
   const [isNavigationPreviewActive, setIsNavigationPreviewActive] =
@@ -1228,6 +1357,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
 
   const stopPickingElement = React.useCallback(() => {
     setIsPickingElement(false);
+    setPickerContextMenu(null);
   }, []);
 
   const hideSelectionPanel = React.useCallback(() => {
@@ -1245,6 +1375,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
 
   const handlePickElement = React.useCallback((nextElement: PickedElement) => {
     setIsPickingElement(false);
+    setPickerContextMenu(null);
     React.startTransition(() => {
       setIsNavigationPreviewActive(false);
       setPickedElement(nextElement);
@@ -1257,6 +1388,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
   const handlePickRelatedElement = React.useCallback(
     (nextElement: PickedElement) => {
       setIsPickingElement(false);
+      setPickerContextMenu(null);
       React.startTransition(() => {
         setIsNavigationPreviewActive(false);
         setPickedElement(nextElement);
@@ -1267,7 +1399,32 @@ export function MacroPanel({ project }: MacroPanelProps) {
     [],
   );
 
-  useElementPicker(isPickingElement, handlePickElement, stopPickingElement);
+  const handlePickerContextMenu = React.useCallback(
+    (state: PickerContextMenuState) => {
+      setPickerContextMenu(state);
+    },
+    [],
+  );
+
+  const handlePickerContextMenuOpenChange = React.useCallback(
+    (isOpen: boolean) => {
+      if (!isOpen) {
+        setPickerContextMenu(null);
+      }
+    },
+    [],
+  );
+
+  const copyPickerSelector = React.useCallback((selector: string) => {
+    void copyTextToClipboard(selector);
+  }, []);
+
+  useElementPicker(
+    isPickingElement,
+    handlePickElement,
+    stopPickingElement,
+    handlePickerContextMenu,
+  );
   useSelectorHighlights(
     matches,
     deferredSelectorState.mode === "series",
@@ -1477,6 +1634,14 @@ export function MacroPanel({ project }: MacroPanelProps) {
           selectorState={selectorState}
           setSelectorState={setSelectorState}
           isPreviewPending={isPreviewPending}
+        />
+      ) : null}
+      {isPickingElement ? (
+        <PickerContextMenu
+          state={pickerContextMenu}
+          onCopySelector={copyPickerSelector}
+          onOpenChange={handlePickerContextMenuOpenChange}
+          onSelectElement={handlePickElement}
         />
       ) : null}
     </>
