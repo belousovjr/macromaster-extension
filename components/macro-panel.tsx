@@ -13,6 +13,7 @@ const MAX_HEIGHT = 720;
 const EDGE_GAP = 12;
 const PANEL_HOST_TAG = "macro-master-panel";
 const PICKER_Z_INDEX = 2147483646;
+const SELECTION_PANEL_Z_INDEX = 2147483645;
 
 type Bounds = {
   x: number;
@@ -213,6 +214,95 @@ function createPickerOverlay() {
   };
 }
 
+function createSelectionPanel(onClose: () => void) {
+  const panel = document.createElement("div");
+  const content = document.createElement("div");
+  const text = document.createElement("span");
+  const closeButton = document.createElement("button");
+
+  panel.style.cssText = [
+    "position: fixed",
+    "left: 0",
+    "right: 0",
+    "bottom: 0",
+    "display: flex",
+    "justify-content: center",
+    "pointer-events: none",
+    `z-index: ${SELECTION_PANEL_Z_INDEX}`,
+    "padding: 0 12px 12px",
+    "box-sizing: border-box",
+  ].join(";");
+  content.style.cssText = [
+    "width: min(720px, 100%)",
+    "min-height: 44px",
+    "display: flex",
+    "align-items: center",
+    "justify-content: space-between",
+    "gap: 12px",
+    "border: 1px solid rgb(134 145 160 / 42%)",
+    "border-radius: 8px",
+    "background: rgb(248 250 252 / 96%)",
+    "color: #17212b",
+    "font: 600 14px/1.4 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "box-shadow: 0 18px 50px rgb(15 23 42 / 18%), 0 0 0 1px rgb(15 23 42 / 6%)",
+    "backdrop-filter: blur(10px)",
+    "pointer-events: auto",
+    "padding: 0 8px 0 16px",
+    "box-sizing: border-box",
+  ].join(";");
+  text.textContent = "Hello world";
+  text.style.cssText = [
+    "min-width: 0",
+    "overflow: hidden",
+    "text-overflow: ellipsis",
+    "white-space: nowrap",
+  ].join(";");
+  closeButton.type = "button";
+  closeButton.setAttribute("aria-label", "Close selected element panel");
+  closeButton.textContent = "×";
+  closeButton.style.cssText = [
+    "width: 30px",
+    "height: 30px",
+    "display: inline-flex",
+    "align-items: center",
+    "justify-content: center",
+    "flex: 0 0 auto",
+    "border: 0",
+    "border-radius: 6px",
+    "background: transparent",
+    "color: #667085",
+    "font: 600 20px/1 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
+    "cursor: pointer",
+  ].join(";");
+  closeButton.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onClose();
+  });
+
+  content.append(text, closeButton);
+  panel.append(content);
+  document.documentElement.append(panel);
+
+  return {
+    remove() {
+      panel.remove();
+    },
+  };
+}
+
+function useSelectionPanel(isVisible: boolean, onClose: () => void) {
+  React.useEffect(() => {
+    if (!isVisible) return;
+
+    const panel = createSelectionPanel(onClose);
+
+    return () => {
+      panel.remove();
+    };
+  }, [isVisible, onClose]);
+}
+
 function useElementPicker(
   isEnabled: boolean,
   onPick: (pickedElement: PickedElement) => void,
@@ -295,17 +385,25 @@ export function MacroPanel({ project }: MacroPanelProps) {
   const [pickedElement, setPickedElement] = React.useState<PickedElement | null>(
     null,
   );
+  const [isSelectionPanelVisible, setIsSelectionPanelVisible] =
+    React.useState(false);
 
   const stopPickingElement = React.useCallback(() => {
     setIsPickingElement(false);
   }, []);
 
+  const closeSelectionPanel = React.useCallback(() => {
+    setIsSelectionPanelVisible(false);
+  }, []);
+
   const handlePickElement = React.useCallback((nextElement: PickedElement) => {
     setPickedElement(nextElement);
     setIsPickingElement(false);
+    setIsSelectionPanelVisible(true);
   }, []);
 
   useElementPicker(isPickingElement, handlePickElement, stopPickingElement);
+  useSelectionPanel(isSelectionPanelVisible, closeSelectionPanel);
 
   React.useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(bounds));
@@ -420,7 +518,16 @@ export function MacroPanel({ project }: MacroPanelProps) {
               "size-7 text-muted-foreground hover:text-foreground",
               isPickingElement && "bg-accent text-accent-foreground",
             )}
-            onClick={() => setIsPickingElement((isPicking) => !isPicking)}
+            onClick={() => {
+              setIsPickingElement((isPicking) => {
+                const nextIsPicking = !isPicking;
+                if (nextIsPicking) {
+                  setIsSelectionPanelVisible(false);
+                }
+
+                return nextIsPicking;
+              });
+            }}
             onPointerDown={(event) => event.stopPropagation()}
             size="icon"
             title="Select element"
