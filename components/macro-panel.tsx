@@ -941,7 +941,12 @@ function SelectionBuilderPanel({
           </div>
         </header>
 
-        <div className="grid gap-3 p-3">
+        <div
+          className={cn(
+            "grid gap-3 p-3",
+            panelsTranslucent && "opacity-20",
+          )}
+        >
           <Tabs
             className="gap-3"
             onValueChange={(value) => setMode(value as SelectorMode)}
