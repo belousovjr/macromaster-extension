@@ -651,8 +651,10 @@ function SelectorRadio({
 
 function SelectionBuilderPanel({
   zIndex,
+  panelsTranslucent,
   matches,
   onInteract,
+  onPreviewActiveChange,
   onClose,
   onConfirm,
   onPickRelatedElement,
@@ -663,8 +665,10 @@ function SelectionBuilderPanel({
   isPreviewPending,
 }: {
   zIndex: number;
+  panelsTranslucent: boolean;
   matches: Element[];
   onInteract: () => void;
+  onPreviewActiveChange: (isActive: boolean) => void;
   onClose: () => void;
   onConfirm: () => void;
   onPickRelatedElement: (pickedElement: PickedElement) => void;
@@ -685,8 +689,15 @@ function SelectionBuilderPanel({
   const setPreviewElementInTransition = (nextElement: Element | null) => {
     React.startTransition(() => {
       setPreviewElement(nextElement);
+      onPreviewActiveChange(nextElement != null);
     });
   };
+  React.useEffect(
+    () => () => {
+      onPreviewActiveChange(false);
+    },
+    [onPreviewActiveChange],
+  );
   const parentOption = React.useMemo(() => {
     const parent = element.parentElement;
     if (
@@ -811,12 +822,15 @@ function SelectionBuilderPanel({
       style={{ zIndex, pointerEvents: "none" }}
     >
       <section
-        className="macro-master-panel w-full max-w-[820px] overflow-auto rounded-lg border border-border bg-card text-card-foreground"
+        className={cn(
+          "macro-master-panel w-full max-w-[820px] overflow-auto rounded-lg border border-border text-card-foreground",
+          panelsTranslucent ? "bg-card/20" : "bg-card",
+        )}
         onFocusCapture={onInteract}
         onPointerDownCapture={onInteract}
         style={{
           maxHeight: "min(420px, calc(100vh - 24px))",
-          pointerEvents: "auto",
+          pointerEvents: panelsTranslucent ? "none" : "auto",
         }}
       >
         <header className="flex items-center justify-between gap-3 border-b border-border px-3 py-2.5">
@@ -852,7 +866,7 @@ function SelectionBuilderPanel({
                 <DropdownMenuTrigger asChild>
                   <Button
                     aria-label="Open element navigation menu"
-                    className="size-8 shrink-0"
+                    className="pointer-events-auto size-8 shrink-0"
                     size="icon"
                     type="button"
                     variant="outline"
@@ -860,7 +874,10 @@ function SelectionBuilderPanel({
                     <Crosshair className="size-4" aria-hidden="true" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuContent
+                  align="end"
+                  className="pointer-events-auto w-48"
+                >
                   {parentOption ? (
                     <DropdownMenuItem
                       onFocus={() =>
@@ -885,7 +902,7 @@ function SelectionBuilderPanel({
                       }
                     >
                       <DropdownMenuSubTrigger>Дети</DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent className="max-h-72 w-72 overflow-y-auto">
+                      <DropdownMenuSubContent className="pointer-events-auto max-h-72 w-72 overflow-y-auto">
                         {childOptions.map((child) => (
                           <DropdownMenuItem
                             key={child.value}
@@ -1145,6 +1162,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
   );
   const [isSelectionPanelVisible, setIsSelectionPanelVisible] =
     React.useState(false);
+  const [isNavigationPreviewActive, setIsNavigationPreviewActive] =
+    React.useState(false);
   const [frontPanel, setFrontPanel] = React.useState<FrontPanel>("floating");
   const [selectorState, setSelectorState] = React.useState<SelectorState>({
     mode: "series",
@@ -1185,6 +1204,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
     frontPanel === "floating" ? PANEL_FRONT_Z_INDEX : PANEL_BACK_Z_INDEX;
   const selectionPanelZIndex =
     frontPanel === "selection" ? PANEL_FRONT_Z_INDEX : PANEL_BACK_Z_INDEX;
+  const panelsTranslucent = isPickingElement || isNavigationPreviewActive;
 
   const bringFloatingPanelToFront = React.useCallback(() => {
     setFrontPanel("floating");
@@ -1200,6 +1220,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
 
   const hideSelectionPanel = React.useCallback(() => {
     React.startTransition(() => {
+      setIsNavigationPreviewActive(false);
       setIsSelectionPanelVisible(false);
     });
   }, []);
@@ -1213,6 +1234,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
   const handlePickElement = React.useCallback((nextElement: PickedElement) => {
     setIsPickingElement(false);
     React.startTransition(() => {
+      setIsNavigationPreviewActive(false);
       setPickedElement(nextElement);
       setSelectorState(getInitialSelectorState(nextElement.element));
       setFrontPanel("selection");
@@ -1224,6 +1246,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
     (nextElement: PickedElement) => {
       setIsPickingElement(false);
       React.startTransition(() => {
+        setIsNavigationPreviewActive(false);
         setPickedElement(nextElement);
         setFrontPanel("selection");
         setIsSelectionPanelVisible(true);
@@ -1328,16 +1351,22 @@ export function MacroPanel({ project }: MacroPanelProps) {
           width: bounds.width,
           height: bounds.height,
           zIndex: floatingPanelZIndex,
+          pointerEvents: panelsTranslucent ? "none" : "auto",
         }}
       >
         <section
           className={cn(
-            "macro-master-panel relative flex h-full w-full select-none flex-col overflow-hidden rounded-lg border border-border bg-card text-card-foreground",
+            "macro-master-panel relative flex h-full w-full select-none flex-col overflow-hidden rounded-lg border border-border text-card-foreground",
+            panelsTranslucent ? "bg-card/20" : "bg-card",
             interaction && "cursor-grabbing",
           )}
+          style={{ pointerEvents: panelsTranslucent ? "none" : "auto" }}
         >
           <header
-            className="flex h-11 shrink-0 cursor-grab items-center gap-2 border-b border-border bg-background px-3 active:cursor-grabbing"
+            className={cn(
+              "flex h-11 shrink-0 cursor-grab items-center gap-2 border-b border-border px-3 active:cursor-grabbing",
+              panelsTranslucent ? "bg-background/20" : "bg-background",
+            )}
             onPointerDown={startDrag}
           >
             <GripHorizontal
@@ -1387,7 +1416,12 @@ export function MacroPanel({ project }: MacroPanelProps) {
             </Button>
           </header>
 
-          <main className="flex flex-1 flex-col items-center justify-center gap-2 bg-card px-6 py-8 text-center">
+          <main
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center gap-2 px-6 py-8 text-center",
+              panelsTranslucent ? "bg-card/20" : "bg-card",
+            )}
+          >
             <p className="text-sm font-medium text-foreground">Hello world</p>
             {pickedElement ? (
               <p className="max-w-full truncate text-xs text-muted-foreground">
@@ -1413,8 +1447,10 @@ export function MacroPanel({ project }: MacroPanelProps) {
       {isSelectionPanelVisible && pickedElement ? (
         <SelectionBuilderPanel
           zIndex={selectionPanelZIndex}
+          panelsTranslucent={panelsTranslucent}
           matches={matches}
           onInteract={bringSelectionPanelToFront}
+          onPreviewActiveChange={setIsNavigationPreviewActive}
           onClose={closeSelectionPanel}
           onConfirm={confirmSelection}
           onPickRelatedElement={handlePickRelatedElement}
