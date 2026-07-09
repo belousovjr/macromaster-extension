@@ -1,8 +1,12 @@
 import * as React from "react";
-import { createPortal } from "react-dom";
 import { Crosshair, GripHorizontal, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { closeActiveProject, type MacroProject } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 
@@ -449,29 +453,6 @@ function createPickerOverlay() {
   };
 }
 
-function usePortalContainer(isVisible: boolean) {
-  const [container, setContainer] = React.useState<HTMLDivElement | null>(null);
-
-  React.useEffect(() => {
-    if (!isVisible) {
-      setContainer(null);
-      return;
-    }
-
-    const nextContainer = document.createElement("div");
-    nextContainer.setAttribute(OVERLAY_ATTR, "true");
-    document.documentElement.append(nextContainer);
-    setContainer(nextContainer);
-
-    return () => {
-      nextContainer.remove();
-      setContainer(null);
-    };
-  }, [isVisible]);
-
-  return container;
-}
-
 function useSelectorHighlights(
   matches: Element[],
   showNumbers: boolean,
@@ -574,7 +555,7 @@ function useElementPicker(
   }, [isEnabled, onCancel, onPick]);
 }
 
-function Checkbox({
+function SelectorCheckbox({
   checked,
   disabled,
   label,
@@ -585,57 +566,52 @@ function Checkbox({
   label: string;
   onChange: (checked: boolean) => void;
 }) {
+  const id = React.useId();
+
   return (
-    <label style={optionStyle(disabled)}>
-      <input
+    <div
+      className={cn(
+        "flex min-h-8 items-center gap-3",
+        disabled && "opacity-50",
+      )}
+    >
+      <Checkbox
         checked={checked}
         disabled={disabled}
-        onChange={(event) => onChange(event.currentTarget.checked)}
-        type="checkbox"
+        id={id}
+        onCheckedChange={(value) => onChange(value === true)}
       />
-      <span>{label}</span>
-    </label>
+      <Label className="min-w-0 truncate" htmlFor={id}>
+        {label}
+      </Label>
+    </div>
   );
 }
 
-function Radio({
-  checked,
+function SelectorRadio({
   disabled,
   label,
-  name,
-  onChange,
+  value,
 }: {
-  checked: boolean;
   disabled?: boolean;
   label: string;
-  name: string;
-  onChange: () => void;
+  value: string;
 }) {
-  return (
-    <label style={optionStyle(disabled)}>
-      <input
-        checked={checked}
-        disabled={disabled}
-        name={name}
-        onChange={onChange}
-        type="radio"
-      />
-      <span>{label}</span>
-    </label>
-  );
-}
+  const id = React.useId();
 
-function optionStyle(disabled?: boolean): React.CSSProperties {
-  return {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 6,
-    minHeight: 28,
-    opacity: disabled ? 0.45 : 1,
-    color: "#17212b",
-    fontSize: 13,
-    fontWeight: 600,
-  };
+  return (
+    <div
+      className={cn(
+        "flex min-h-8 items-center gap-3",
+        disabled && "opacity-50",
+      )}
+    >
+      <RadioGroupItem disabled={disabled} id={id} value={value} />
+      <Label className="min-w-0 truncate" htmlFor={id}>
+        {label}
+      </Label>
+    </div>
+  );
 }
 
 function SelectionBuilderPanel({
@@ -741,144 +717,87 @@ function SelectionBuilderPanel({
 
   return (
     <div
-      style={{
-        position: "fixed",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: SELECTION_PANEL_Z_INDEX,
-        boxSizing: "border-box",
-        display: "flex",
-        justifyContent: "center",
-        padding: "0 12px 12px",
-        pointerEvents: "none",
-      }}
+      className="macro-master-root fixed inset-x-0 bottom-0 box-border flex justify-center px-3 pb-3"
+      style={{ zIndex: SELECTION_PANEL_Z_INDEX, pointerEvents: "none" }}
     >
       <section
+        className="macro-master-panel w-full max-w-[820px] overflow-auto rounded-lg border border-border bg-card text-card-foreground"
         style={{
-          width: "min(820px, 100%)",
           maxHeight: "min(420px, calc(100vh - 24px))",
-          overflow: "auto",
-          border: "1px solid rgb(134 145 160 / 42%)",
-          borderRadius: 8,
-          background: "rgb(248 250 252 / 97%)",
-          boxShadow:
-            "0 18px 50px rgb(15 23 42 / 18%), 0 0 0 1px rgb(15 23 42 / 6%)",
-          color: "#17212b",
-          font:
-            "500 13px/1.4 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
           pointerEvents: "auto",
         }}
       >
-        <header
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            borderBottom: "1px solid rgb(134 145 160 / 24%)",
-            padding: "10px 12px",
-          }}
-        >
-          <div style={{ minWidth: 0 }}>
-            <div
-              style={{
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                fontSize: 14,
-                fontWeight: 800,
-              }}
-            >
-              <span style={{ color: "#2563eb" }}>
+        <header className="flex items-center justify-between gap-3 border-b border-border px-3 py-2.5">
+          <div className="min-w-0">
+            <div className="truncate text-sm font-semibold">
+              <span className="text-primary">
                 {pickedElement.description.tag}
               </span>
               {pickedElement.description.details
                 ? pickedElement.description.details
                 : ""}
             </div>
-            <div style={{ color: "#667085", fontSize: 12 }}>
-              {selector ?? "Choose at least one selector"} · {matches.length}{" "}
+            <div className="truncate text-xs text-muted-foreground">
+              {selector ?? "Choose at least one selector"} - {matches.length}{" "}
               match{matches.length === 1 ? "" : "es"}
             </div>
           </div>
-          <button
+          <Button
             aria-label="Close selector panel"
+            className="size-7 text-muted-foreground hover:text-foreground"
             onClick={onClose}
-            style={{
-              alignItems: "center",
-              background: "transparent",
-              border: 0,
-              borderRadius: 6,
-              color: "#667085",
-              cursor: "pointer",
-              display: "inline-flex",
-              flex: "0 0 auto",
-              font:
-                "600 20px/1 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
-              height: 30,
-              justifyContent: "center",
-              width: 30,
-            }}
+            size="icon"
             type="button"
+            variant="ghost"
           >
-            x
-          </button>
+            <X className="size-4" aria-hidden="true" />
+          </Button>
         </header>
 
-        <div style={{ display: "grid", gap: 12, padding: 12 }}>
-          <div style={{ display: "flex", gap: 8 }}>
-            {(["single", "series"] as const).map((mode) => (
-              <button
-                key={mode}
-                onClick={() => setMode(mode)}
-                style={{
-                  border:
-                    selectorState.mode === mode
-                      ? "1px solid #17212b"
-                      : "1px solid rgb(134 145 160 / 42%)",
-                  borderRadius: 6,
-                  background:
-                    selectorState.mode === mode ? "#17212b" : "#ffffff",
-                  color: selectorState.mode === mode ? "#f8fafc" : "#17212b",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  minHeight: 32,
-                  padding: "0 12px",
-                }}
-                type="button"
-              >
-                {mode === "single" ? "Single element" : "Series"}
-              </button>
-            ))}
-          </div>
+        <Tabs
+          className="gap-3 p-3"
+          onValueChange={(value) => setMode(value as SelectorMode)}
+          value={selectorState.mode}
+        >
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="single">Single element</TabsTrigger>
+            <TabsTrigger value="series">Series</TabsTrigger>
+          </TabsList>
 
-          {selectorState.mode === "single" ? (
-            <fieldset style={fieldsetStyle}>
-              <legend style={legendStyle}>Static single selectors</legend>
-              <div style={optionsGridStyle}>
+          <TabsContent value="single">
+            <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
+              <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                Static single selectors
+              </legend>
+              <RadioGroup
+                className="grid gap-1 sm:grid-cols-2"
+                onValueChange={(value) =>
+                  setSelectorState((current) => ({
+                    ...current,
+                    single: value as SingleSelectorKind,
+                  }))
+                }
+                value={selectorState.single ?? ""}
+              >
                 {singleOptions.map((option) => (
-                  <Radio
-                    checked={selectorState.single === option.kind}
+                  <SelectorRadio
                     disabled={option.disabled}
                     key={option.kind}
                     label={option.label}
-                    name="single-selector"
-                    onChange={() =>
-                      setSelectorState((current) => ({
-                        ...current,
-                        single: option.kind,
-                      }))
-                    }
+                    value={option.kind}
                   />
                 ))}
-              </div>
+              </RadioGroup>
             </fieldset>
-          ) : (
-            <fieldset style={fieldsetStyle}>
-              <legend style={legendStyle}>Series selectors</legend>
-              <div style={optionsGridStyle}>
-                <Checkbox
+          </TabsContent>
+
+          <TabsContent value="series">
+            <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
+              <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                Series selectors
+              </legend>
+              <div className="grid gap-1 sm:grid-cols-2">
+                <SelectorCheckbox
                   checked={selectorState.series.tag}
                   label={`tag <${element.tagName.toLowerCase()}>`}
                   onChange={(checked) =>
@@ -889,7 +808,7 @@ function SelectionBuilderPanel({
                   }
                 />
                 {classOptions.map((option) => (
-                  <Checkbox
+                  <SelectorCheckbox
                     checked={selectorState.series.classes.includes(
                       option.value,
                     )}
@@ -899,7 +818,7 @@ function SelectionBuilderPanel({
                   />
                 ))}
                 {attributeOptions.map((option) => (
-                  <Checkbox
+                  <SelectorCheckbox
                     checked={selectorState.series.attributes.includes(
                       option.value,
                     )}
@@ -911,9 +830,26 @@ function SelectionBuilderPanel({
                   />
                 ))}
               </div>
-              <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
-                <div style={legendStyle}>Position pattern</div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <div className="mt-3 grid gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  Position pattern
+                </div>
+                <RadioGroup
+                  className="grid gap-1 sm:grid-cols-2"
+                  onValueChange={(value) =>
+                    setSelectorState((current) => ({
+                      ...current,
+                      series: {
+                        ...current.series,
+                        position: {
+                          ...current.series.position,
+                          kind: value as SeriesPositionKind,
+                        },
+                      },
+                    }))
+                  }
+                  value={selectorState.series.position.kind}
+                >
                   {[
                     { kind: "any" as const, label: "Any position" },
                     { kind: "first" as const, label: "First" },
@@ -921,49 +857,18 @@ function SelectionBuilderPanel({
                     { kind: "exact" as const, label: "Exact #" },
                     { kind: "formula" as const, label: "Formula an+b" },
                   ].map((option) => (
-                    <button
+                    <SelectorRadio
                       key={option.kind}
-                      onClick={() =>
-                        setSelectorState((current) => ({
-                          ...current,
-                          series: {
-                            ...current.series,
-                            position: {
-                              ...current.series.position,
-                              kind: option.kind,
-                            },
-                          },
-                        }))
-                      }
-                      style={{
-                        border:
-                          selectorState.series.position.kind === option.kind
-                            ? "1px solid #17212b"
-                            : "1px solid rgb(134 145 160 / 42%)",
-                        borderRadius: 6,
-                        background:
-                          selectorState.series.position.kind === option.kind
-                            ? "#17212b"
-                            : "#ffffff",
-                        color:
-                          selectorState.series.position.kind === option.kind
-                            ? "#f8fafc"
-                            : "#17212b",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                        minHeight: 30,
-                        padding: "0 10px",
-                      }}
-                      type="button"
-                    >
-                      {option.label}
-                    </button>
+                      label={option.label}
+                      value={option.kind}
+                    />
                   ))}
-                </div>
+                </RadioGroup>
                 {selectorState.series.position.kind === "exact" ? (
-                  <label style={numberFieldStyle}>
+                  <label className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
                     <span>Child number</span>
-                    <input
+                    <Input
+                      className="h-8 w-20"
                       min={1}
                       onChange={(event) => {
                         const exact = Number(event.currentTarget.value) || 1;
@@ -979,24 +884,17 @@ function SelectionBuilderPanel({
                           },
                         }));
                       }}
-                      style={numberInputStyle}
                       type="number"
                       value={selectorState.series.position.exact}
                     />
                   </label>
                 ) : null}
                 {selectorState.series.position.kind === "formula" ? (
-                  <div
-                    style={{
-                      alignItems: "center",
-                      display: "flex",
-                      flexWrap: "wrap",
-                      gap: 8,
-                    }}
-                  >
-                    <label style={numberFieldStyle}>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
                       <span>a</span>
-                      <input
+                      <Input
+                        className="h-8 w-20"
                         min={1}
                         onChange={(event) => {
                           const step = Number(event.currentTarget.value) || 1;
@@ -1012,15 +910,17 @@ function SelectionBuilderPanel({
                             },
                           }));
                         }}
-                        style={numberInputStyle}
                         type="number"
                         value={selectorState.series.position.step}
                       />
                     </label>
-                    <span style={{ color: "#667085", fontWeight: 700 }}>n +</span>
-                    <label style={numberFieldStyle}>
+                    <span className="text-sm font-bold text-muted-foreground">
+                      n +
+                    </span>
+                    <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
                       <span>b</span>
-                      <input
+                      <Input
+                        className="h-8 w-20"
                         min={0}
                         onChange={(event) => {
                           const offset = Number(event.currentTarget.value) || 0;
@@ -1036,12 +936,11 @@ function SelectionBuilderPanel({
                             },
                           }));
                         }}
-                        style={numberInputStyle}
                         type="number"
                         value={selectorState.series.position.offset}
                       />
                     </label>
-                    <span style={{ color: "#667085", fontSize: 12 }}>
+                    <span className="text-xs text-muted-foreground">
                       Example: {selectorState.series.position.step}n+
                       {selectorState.series.position.offset}
                     </span>
@@ -1049,91 +948,18 @@ function SelectionBuilderPanel({
                 ) : null}
               </div>
             </fieldset>
-          )}
+          </TabsContent>
 
           {!isValid ? (
-            <p style={{ color: "#b45309", fontSize: 12, margin: 0 }}>
+            <p className="m-0 text-xs text-amber-700">
               {selectorState.mode === "single"
                 ? "Choose at least one static selector."
                 : "Choose at least one series selector."}
             </p>
           ) : null}
-        </div>
+        </Tabs>
       </section>
     </div>
-  );
-}
-
-const fieldsetStyle: React.CSSProperties = {
-  border: "1px solid rgb(134 145 160 / 24%)",
-  borderRadius: 8,
-  margin: 0,
-  padding: "10px 12px 12px",
-};
-
-const legendStyle: React.CSSProperties = {
-  color: "#667085",
-  fontSize: 11,
-  fontWeight: 800,
-  letterSpacing: "0.06em",
-  padding: "0 4px",
-  textTransform: "uppercase",
-};
-
-const optionsGridStyle: React.CSSProperties = {
-  display: "grid",
-  gap: 8,
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-};
-
-const numberFieldStyle: React.CSSProperties = {
-  alignItems: "center",
-  color: "#17212b",
-  display: "inline-flex",
-  fontSize: 13,
-  fontWeight: 700,
-  gap: 8,
-};
-
-const numberInputStyle: React.CSSProperties = {
-  border: "1px solid rgb(134 145 160 / 42%)",
-  borderRadius: 6,
-  color: "#17212b",
-  font: "600 13px/1.4 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
-  height: 30,
-  padding: "0 8px",
-  width: 74,
-};
-
-function SelectionPanelPortal({
-  matches,
-  onClose,
-  pickedElement,
-  selector,
-  selectorState,
-  setSelectorState,
-}: {
-  matches: Element[];
-  onClose: () => void;
-  pickedElement: PickedElement | null;
-  selector: string | null;
-  selectorState: SelectorState;
-  setSelectorState: React.Dispatch<React.SetStateAction<SelectorState>>;
-}) {
-  const container = usePortalContainer(Boolean(pickedElement));
-
-  if (!container || !pickedElement) return null;
-
-  return createPortal(
-    <SelectionBuilderPanel
-      matches={matches}
-      onClose={onClose}
-      pickedElement={pickedElement}
-      selector={selector}
-      selectorState={selectorState}
-      setSelectorState={setSelectorState}
-    />,
-    container,
   );
 }
 
@@ -1362,8 +1188,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
           </button>
         </section>
       </div>
-      {isSelectionPanelVisible ? (
-        <SelectionPanelPortal
+      {isSelectionPanelVisible && pickedElement ? (
+        <SelectionBuilderPanel
           matches={matches}
           onClose={closeSelectionPanel}
           pickedElement={pickedElement}
