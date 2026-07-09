@@ -5,8 +5,9 @@ import type { Root } from 'react-dom/client';
 import { MacroPanel } from '@/components/macro-panel';
 import {
   ACTIVE_PROJECT_ID_KEY,
-  getActiveProject,
-  getProjectState,
+  ACTIVE_PROJECT_TAB_ID_KEY,
+  GET_ACTIVE_PROJECT_FOR_TAB_MESSAGE,
+  type ActiveProjectForTabResponse,
   type MacroProject,
   PROJECTS_KEY,
 } from '@/lib/projects';
@@ -44,7 +45,11 @@ export default defineContentScript({
     });
 
     const syncPanel = async () => {
-      const activeProject = getActiveProject(await getProjectState());
+      const response =
+        (await browser.runtime.sendMessage({
+          type: GET_ACTIVE_PROJECT_FOR_TAB_MESSAGE,
+        })) as ActiveProjectForTabResponse;
+      const activeProject = response.project;
 
       if (!activeProject) {
         ui.remove();
@@ -62,7 +67,11 @@ export default defineContentScript({
     >[0] = (changes, areaName) => {
       if (areaName !== 'local') return;
 
-      if (changes[ACTIVE_PROJECT_ID_KEY] || changes[PROJECTS_KEY]) {
+      if (
+        changes[ACTIVE_PROJECT_ID_KEY] ||
+        changes[ACTIVE_PROJECT_TAB_ID_KEY] ||
+        changes[PROJECTS_KEY]
+      ) {
         void syncPanel();
       }
     };

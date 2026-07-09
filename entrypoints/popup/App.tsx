@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import {
   ACTIVE_PROJECT_ID_KEY,
+  ACTIVE_PROJECT_TAB_ID_KEY,
   createProjectAndOpen,
   getProjectState,
   openProject,
@@ -12,10 +13,74 @@ import {
 const EMPTY_STATE: ProjectState = {
   projects: [],
   activeProjectId: null,
+  activeProjectTabId: null,
 };
+
+type PopupTabInfo = {
+  id: number;
+  index: number;
+  number: number;
+  windowId: number;
+};
+
+async function getCurrentTabInfo(): Promise<PopupTabInfo | null> {
+  const [tab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  if (tab?.id == null) {
+    return null;
+  }
+
+  return {
+    id: tab.id,
+    index: tab.index,
+    number: tab.index + 1,
+    windowId: tab.windowId,
+  };
+}
+
+async function getTabInfo(tabId: number): Promise<PopupTabInfo | null> {
+  try {
+    const tab = await browser.tabs.get(tabId);
+    if (tab.id == null) {
+      return null;
+    }
+
+    return {
+      id: tab.id,
+      index: tab.index,
+      number: tab.index + 1,
+      windowId: tab.windowId,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function formatRelativeTabPosition(fromTab: PopupTabInfo, toTab: PopupTabInfo) {
+  if (fromTab.windowId !== toTab.windowId) {
+    return null;
+  }
+
+  const offset = toTab.index - fromTab.index;
+  if (offset === 0) {
+    return null;
+  }
+
+  const count = Math.abs(offset);
+  const noun = count === 1 ? 'tab' : 'tabs';
+  const direction = offset > 0 ? 'right' : 'left';
+
+  return `${count} ${noun} ${direction}`;
+}
 
 function App() {
   const [state, setState] = useState<ProjectState>(EMPTY_STATE);
+  const [currentTab, setCurrentTab] = useState<PopupTabInfo | null>(null);
+  const [activeProjectTab, setActiveProjectTab] =
+    useState<PopupTabInfo | null>(null);
   const [projectName, setProjectName] = useState('');
   const [isReady, setIsReady] = useState(false);
 
@@ -23,10 +88,19 @@ function App() {
     let isMounted = true;
 
     const syncProjects = async () => {
-      const nextState = await getProjectState();
+      const [nextState, nextTab] = await Promise.all([
+        getProjectState(),
+        getCurrentTabInfo(),
+      ]);
+      const nextActiveProjectTab =
+        nextState.activeProjectTabId == null
+          ? null
+          : await getTabInfo(nextState.activeProjectTabId);
       if (!isMounted) return;
 
       setState(nextState);
+      setCurrentTab(nextTab);
+      setActiveProjectTab(nextActiveProjectTab);
       setIsReady(true);
     };
 
@@ -37,7 +111,11 @@ function App() {
     >[0] = (changes, areaName) => {
       if (areaName !== 'local') return;
 
-      if (changes[PROJECTS_KEY] || changes[ACTIVE_PROJECT_ID_KEY]) {
+      if (
+        changes[PROJECTS_KEY] ||
+        changes[ACTIVE_PROJECT_ID_KEY] ||
+        changes[ACTIVE_PROJECT_TAB_ID_KEY]
+      ) {
         void syncProjects();
       }
     };
@@ -53,10 +131,39 @@ function App() {
   const handleCreateProject = async (event: React.FormEvent) => {
     event.preventDefault();
 
-    if (!projectName.trim()) return;
+    if (!projectName.trim() || currentTab == null) return;
 
-    await createProjectAndOpen(projectName);
+    await createProjectAndOpen(projectName, currentTab.id);
     setProjectName('');
+  };
+
+  const getProjectStatus = (projectId: string) => {
+    if (projectId !== state.activeProjectId) {
+      return 'Closed';
+    }
+
+    if (state.activeProjectTabId == null || activeProjectTab == null) {
+      return 'Other tab';
+    }
+
+    if (state.activeProjectTabId === currentTab?.id) {
+      return 'Active';
+    }
+
+    if (currentTab != null && currentTab.windowId !== activeProjectTab.windowId) {
+      return 'Other window';
+    }
+
+    const relativePosition =
+      currentTab == null
+        ? null
+        : formatRelativeTabPosition(currentTab, activeProjectTab);
+
+    if (!relativePosition) {
+      return 'Other tab';
+    }
+
+    return `Tab #${activeProjectTab.number}, ${relativePosition}`;
   };
 
   return (
@@ -83,7 +190,7 @@ function App() {
           />
           <button
             className="primary-button"
-            disabled={!isReady || !projectName.trim()}
+            disabled={!isReady || currentTab == null || !projectName.trim()}
             type="submit"
           >
             Create
@@ -102,19 +209,25 @@ function App() {
           ) : (
             state.projects.map((project) => {
               const isActive = project.id === state.activeProjectId;
+              const status = getProjectStatus(project.id);
+              const currentTabId = currentTab?.id;
 
               return (
                 <button
                   className="project-row"
-                  disabled={!isReady}
+                  disabled={!isReady || currentTabId == null}
                   key={project.id}
-                  onClick={() => void openProject(project.id)}
+                  onClick={() => {
+                    if (currentTabId == null) return;
+
+                    void openProject(project.id, currentTabId);
+                  }}
                   role="listitem"
                   type="button"
                 >
                   <span className="project-name">{project.name}</span>
                   <span className={isActive ? 'status active' : 'status'}>
-                    {isActive ? 'Open' : 'Closed'}
+                    {status}
                   </span>
                 </button>
               );

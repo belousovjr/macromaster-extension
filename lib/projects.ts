@@ -1,5 +1,8 @@
 export const PROJECTS_KEY = 'macroMasterProjects';
 export const ACTIVE_PROJECT_ID_KEY = 'macroMasterActiveProjectId';
+export const ACTIVE_PROJECT_TAB_ID_KEY = 'macroMasterActiveProjectTabId';
+export const GET_ACTIVE_PROJECT_FOR_TAB_MESSAGE =
+  'macroMaster:getActiveProjectForTab';
 
 export type MacroProject = {
   id: string;
@@ -11,11 +14,17 @@ export type MacroProject = {
 export type ProjectStorageState = {
   [PROJECTS_KEY]?: MacroProject[];
   [ACTIVE_PROJECT_ID_KEY]?: string | null;
+  [ACTIVE_PROJECT_TAB_ID_KEY]?: number | null;
 };
 
 export type ProjectState = {
   projects: MacroProject[];
   activeProjectId: string | null;
+  activeProjectTabId: number | null;
+};
+
+export type ActiveProjectForTabResponse = {
+  project: MacroProject | null;
 };
 
 export function createProjectId() {
@@ -37,23 +46,35 @@ export function getActiveProject(state: ProjectState) {
   );
 }
 
+export function getActiveProjectForTab(state: ProjectState, tabId?: number) {
+  if (tabId == null || state.activeProjectTabId !== tabId) {
+    return null;
+  }
+
+  return getActiveProject(state);
+}
+
 export async function getProjectState(): Promise<ProjectState> {
   const state = (await browser.storage.local.get([
     PROJECTS_KEY,
     ACTIVE_PROJECT_ID_KEY,
+    ACTIVE_PROJECT_TAB_ID_KEY,
   ])) as ProjectStorageState;
   const projects = state[PROJECTS_KEY] ?? [];
   const activeProjectId = state[ACTIVE_PROJECT_ID_KEY] ?? null;
+  const activeProjectTabId = state[ACTIVE_PROJECT_TAB_ID_KEY] ?? null;
+  const hasActiveProject = projects.some(
+    (project) => project.id === activeProjectId,
+  );
 
   return {
     projects,
-    activeProjectId: projects.some((project) => project.id === activeProjectId)
-      ? activeProjectId
-      : null,
+    activeProjectId: hasActiveProject ? activeProjectId : null,
+    activeProjectTabId: hasActiveProject ? activeProjectTabId : null,
   };
 }
 
-export async function createProjectAndOpen(name: string) {
+export async function createProjectAndOpen(name: string, tabId: number) {
   const normalizedName = normalizeProjectName(name);
   if (!normalizedName) {
     throw new Error('Project name is required');
@@ -71,15 +92,22 @@ export async function createProjectAndOpen(name: string) {
   await browser.storage.local.set({
     [PROJECTS_KEY]: [project, ...state.projects],
     [ACTIVE_PROJECT_ID_KEY]: project.id,
+    [ACTIVE_PROJECT_TAB_ID_KEY]: tabId,
   });
 
   return project;
 }
 
-export async function openProject(projectId: string) {
-  await browser.storage.local.set({ [ACTIVE_PROJECT_ID_KEY]: projectId });
+export async function openProject(projectId: string, tabId: number) {
+  await browser.storage.local.set({
+    [ACTIVE_PROJECT_ID_KEY]: projectId,
+    [ACTIVE_PROJECT_TAB_ID_KEY]: tabId,
+  });
 }
 
 export async function closeActiveProject() {
-  await browser.storage.local.set({ [ACTIVE_PROJECT_ID_KEY]: null });
+  await browser.storage.local.set({
+    [ACTIVE_PROJECT_ID_KEY]: null,
+    [ACTIVE_PROJECT_TAB_ID_KEY]: null,
+  });
 }
