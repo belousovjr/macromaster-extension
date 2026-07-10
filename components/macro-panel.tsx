@@ -5,6 +5,7 @@ import {
   GripHorizontal,
   ListTree,
   LoaderCircle,
+  Minus,
   MousePointerClick,
   X,
 } from "lucide-react";
@@ -898,6 +899,7 @@ function SelectionBuilderPanel({
   >(null);
   const [isMatchNavigationOpen, setIsMatchNavigationOpen] =
     React.useState(false);
+  const [isCollapsed, setIsCollapsed] = React.useState(false);
   const [matchNavigationSelectKey, setMatchNavigationSelectKey] =
     React.useState(0);
   const setPreviewElementInTransition = (nextElement: Element | null) => {
@@ -1055,6 +1057,7 @@ function SelectionBuilderPanel({
       <section
         className={cn(
           "macro-master-panel w-full max-w-[820px] overflow-auto rounded-lg border border-border text-card-foreground",
+          isCollapsed && "overflow-hidden",
           panelsTranslucent ? "bg-card/20" : "bg-card",
         )}
         onFocusCapture={onInteract}
@@ -1220,6 +1223,25 @@ function SelectionBuilderPanel({
               </DropdownMenu>
             ) : null}
             <Button
+              aria-label={
+                isCollapsed
+                  ? "Expand selector panel"
+                  : "Collapse selector panel"
+              }
+              aria-pressed={isCollapsed}
+              className={cn(
+                "size-7 text-muted-foreground hover:text-foreground",
+                isCollapsed && "bg-accent text-accent-foreground",
+              )}
+              onClick={() => setIsCollapsed((current) => !current)}
+              size="icon"
+              title={isCollapsed ? "Expand panel" : "Collapse panel"}
+              type="button"
+              variant="ghost"
+            >
+              <Minus className="size-4" aria-hidden="true" />
+            </Button>
+            <Button
               aria-label="Close selector panel"
               className="size-7 text-muted-foreground hover:text-foreground"
               onClick={onClose}
@@ -1232,12 +1254,13 @@ function SelectionBuilderPanel({
           </div>
         </header>
 
-        <div
-          className={cn(
-            "grid gap-3 p-3",
-            panelsTranslucent && "opacity-20",
-          )}
-        >
+        {isCollapsed ? null : (
+          <div
+            className={cn(
+              "grid gap-3 p-3",
+              panelsTranslucent && "opacity-20",
+            )}
+          >
           <Tabs
             className="gap-3"
             onValueChange={(value) => setMode(value as SelectorMode)}
@@ -1442,6 +1465,7 @@ function SelectionBuilderPanel({
             </Button>
           </footer>
         </div>
+        )}
       </section>
     </div>
   );
@@ -1466,6 +1490,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
   const [isNavigationPreviewActive, setIsNavigationPreviewActive] =
     React.useState(false);
   const [isRenderingHighlights, setIsRenderingHighlights] =
+    React.useState(false);
+  const [isFloatingPanelCollapsed, setIsFloatingPanelCollapsed] =
     React.useState(false);
   const [frontPanel, setFrontPanel] = React.useState<FrontPanel>("floating");
   const [selectorState, setSelectorState] = React.useState<SelectorState>({
@@ -1696,7 +1722,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
         style={{
           transform: `translate3d(${bounds.x}px, ${bounds.y}px, 0)`,
           width: bounds.width,
-          height: bounds.height,
+          height: isFloatingPanelCollapsed ? 44 : bounds.height,
           zIndex: floatingPanelZIndex,
           pointerEvents: panelsTranslucent ? "none" : "auto",
         }}
@@ -1744,6 +1770,30 @@ export function MacroPanel({ project }: MacroPanelProps) {
               <Crosshair className="size-4" aria-hidden="true" />
             </Button>
             <Button
+              aria-label={
+                isFloatingPanelCollapsed
+                  ? "Expand project panel"
+                  : "Collapse project panel"
+              }
+              aria-pressed={isFloatingPanelCollapsed}
+              className={cn(
+                "size-7 text-muted-foreground hover:text-foreground",
+                isFloatingPanelCollapsed && "bg-accent text-accent-foreground",
+              )}
+              onClick={() =>
+                setIsFloatingPanelCollapsed((current) => !current)
+              }
+              onPointerDown={(event) => event.stopPropagation()}
+              size="icon"
+              title={
+                isFloatingPanelCollapsed ? "Expand panel" : "Collapse panel"
+              }
+              type="button"
+              variant="ghost"
+            >
+              <Minus className="size-4" aria-hidden="true" />
+            </Button>
+            <Button
               aria-label="Close project"
               className="size-7 text-muted-foreground hover:text-foreground"
               onClick={() => void closeActiveProject()}
@@ -1756,6 +1806,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
             </Button>
           </header>
 
+          {isFloatingPanelCollapsed ? null : (
           <main
             className={cn(
               "flex flex-1 flex-col items-center justify-center gap-2 px-6 py-8 text-center",
@@ -1773,7 +1824,9 @@ export function MacroPanel({ project }: MacroPanelProps) {
               </p>
             )}
           </main>
+          )}
 
+          {isFloatingPanelCollapsed ? null : (
           <button
             aria-label="Resize MacroMaster panel"
             className="absolute bottom-1 right-1 size-5 cursor-nwse-resize rounded-sm text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
@@ -1782,6 +1835,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
           >
             <span className="absolute bottom-1 right-1 h-2.5 w-2.5 border-b border-r border-current" />
           </button>
+          )}
         </section>
       </div>
       {isSelectionPanelVisible && pickedElement ? (
