@@ -3,6 +3,8 @@ import {
   Clipboard,
   Crosshair,
   GripHorizontal,
+  ListTree,
+  LoaderCircle,
   MousePointerClick,
   X,
 } from "lucide-react";
@@ -27,6 +29,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { closeActiveProject, type MacroProject } from "@/lib/projects";
 import { cn } from "@/lib/utils";
@@ -341,6 +350,10 @@ function getSelectorMatches(selector: string | null) {
   } catch {
     return [];
   }
+}
+
+function scrollElementToPageTop(element: Element) {
+  element.scrollIntoView({ block: "start", inline: "nearest" });
 }
 
 function createHighlightElement(element: Element, index: number | null) {
@@ -817,6 +830,8 @@ function SelectionBuilderPanel({
   const [activeNavigationSub, setActiveNavigationSub] = React.useState<
     "children" | null
   >(null);
+  const [matchNavigationSelectKey, setMatchNavigationSelectKey] =
+    React.useState(0);
   const setPreviewElementInTransition = (nextElement: Element | null) => {
     React.startTransition(() => {
       setPreviewElement(nextElement);
@@ -852,6 +867,15 @@ function SelectionBuilderPanel({
         value: String(index),
       })),
     [element],
+  );
+  const matchOptions = React.useMemo(
+    () =>
+      matches.map((match, index) => ({
+        element: match,
+        description: describeElement(match),
+        value: String(index),
+      })),
+    [matches],
   );
   const classOptions = React.useMemo(() => getClassOptions(element), [element]);
   const attributeOptions = React.useMemo(
@@ -895,6 +919,14 @@ function SelectionBuilderPanel({
       element: nextElement,
       description: describeElement(nextElement),
     });
+  };
+
+  const navigateToMatchElement = (value: string) => {
+    const matchElement = matchOptions[Number(value)]?.element;
+    if (!matchElement) return;
+
+    scrollElementToPageTop(matchElement);
+    setMatchNavigationSelectKey((key) => key + 1);
   };
 
   const setMode = (mode: SelectorMode) => {
@@ -971,20 +1003,70 @@ function SelectionBuilderPanel({
           )}
         >
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-semibold">
-              <span className="text-primary">
-                {pickedElement.description.tag}
-              </span>
-              {pickedElement.description.details
-                ? pickedElement.description.details
-                : ""}
+            <div className="flex min-w-0 items-center gap-1.5">
+              <div className="truncate text-sm font-semibold">
+                <span className="text-primary">
+                  {pickedElement.description.tag}
+                </span>
+                {pickedElement.description.details
+                  ? pickedElement.description.details
+                  : ""}
+              </div>
+              {isPreviewPending ? (
+                <LoaderCircle
+                  className="size-3.5 shrink-0 animate-spin text-muted-foreground"
+                  aria-label="Updating matches"
+                />
+              ) : null}
             </div>
             <div className="truncate text-xs text-muted-foreground">
               {matches.length} match{matches.length === 1 ? "" : "es"}
-              {isPreviewPending ? ", updating" : ""}
             </div>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
+            <Select
+              key={matchNavigationSelectKey}
+              onValueChange={navigateToMatchElement}
+            >
+              <SelectTrigger
+                aria-label="Navigate to match element"
+                className="pointer-events-auto mr-2 h-8 w-[190px] shrink-0"
+                size="sm"
+              >
+                <ListTree className="size-4" aria-hidden="true" />
+                <SelectValue
+                  placeholder={`nav to match (${matchOptions.length})`}
+                />
+              </SelectTrigger>
+              <SelectContent
+                align="end"
+                className="pointer-events-auto max-h-72 w-80"
+              >
+                {matchOptions.length > 0 ? (
+                  matchOptions.map((option, index) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="shrink-0 text-xs font-semibold text-muted-foreground">
+                          #{index + 1}
+                        </span>
+                        <span className="min-w-0 truncate">
+                          <span className="text-primary">
+                            {option.description.tag}
+                          </span>
+                          {option.description.details
+                            ? option.description.details
+                            : ""}
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))
+                ) : (
+                  <SelectItem disabled value="no-match-elements">
+                    No match elements
+                  </SelectItem>
+                )}
+              </SelectContent>
+            </Select>
             {isSingleMode &&
             (parentOption || childOptions.length > 0) ? (
               <DropdownMenu
@@ -1280,15 +1362,10 @@ function SelectionBuilderPanel({
             </TabsContent>
           </Tabs>
 
-          <footer className="grid gap-3 border-t border-border pt-3">
-            <div className="truncate rounded-md bg-muted px-2 py-1.5 font-mono text-xs text-muted-foreground">
-              {selector ?? "Choose at least one selector"}
-            </div>
-            <div className="flex justify-end">
-              <Button disabled={!isValid} onClick={onConfirm} type="button">
-                Confirm
-              </Button>
-            </div>
+          <footer className="flex justify-end border-t border-border pt-3">
+            <Button disabled={!isValid} onClick={onConfirm} type="button">
+              Confirm
+            </Button>
           </footer>
         </div>
       </section>
