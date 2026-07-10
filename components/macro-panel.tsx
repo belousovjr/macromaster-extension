@@ -980,8 +980,7 @@ function SelectionBuilderPanel({
                 : ""}
             </div>
             <div className="truncate text-xs text-muted-foreground">
-              {selector ?? "Choose at least one selector"} - {matches.length}{" "}
-              match{matches.length === 1 ? "" : "es"}
+              {matches.length} match{matches.length === 1 ? "" : "es"}
               {isPreviewPending ? ", updating" : ""}
             </div>
           </div>
@@ -1281,10 +1280,15 @@ function SelectionBuilderPanel({
             </TabsContent>
           </Tabs>
 
-          <footer className="flex justify-end border-t border-border pt-3">
-            <Button disabled={!isValid} onClick={onConfirm} type="button">
-              Confirm
-            </Button>
+          <footer className="grid gap-3 border-t border-border pt-3">
+            <div className="truncate rounded-md bg-muted px-2 py-1.5 font-mono text-xs text-muted-foreground">
+              {selector ?? "Choose at least one selector"}
+            </div>
+            <div className="flex justify-end">
+              <Button disabled={!isValid} onClick={onConfirm} type="button">
+                Confirm
+              </Button>
+            </div>
           </footer>
         </div>
       </section>
