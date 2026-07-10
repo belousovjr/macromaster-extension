@@ -7,6 +7,7 @@ import {
   LoaderCircle,
   Minus,
   MousePointerClick,
+  Pencil,
   X,
 } from "lucide-react";
 
@@ -38,6 +39,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { closeActiveProject, type MacroProject } from "@/lib/projects";
 import { cn } from "@/lib/utils";
 
@@ -872,6 +874,12 @@ function SelectionBuilderPanel({
   onPickRelatedElement,
   pickedElement,
   selector,
+  isEditingSelector,
+  draftSelector,
+  onDraftSelectorChange,
+  onStartEditingSelector,
+  onCancelEditingSelector,
+  canConfirm,
   selectorState,
   setSelectorState,
   isUpdatingMatches,
@@ -887,6 +895,12 @@ function SelectionBuilderPanel({
   onPickRelatedElement: (pickedElement: PickedElement) => void;
   pickedElement: PickedElement;
   selector: string | null;
+  isEditingSelector: boolean;
+  draftSelector: string;
+  onDraftSelectorChange: (selector: string) => void;
+  onStartEditingSelector: () => void;
+  onCancelEditingSelector: () => void;
+  canConfirm: boolean;
   selectorState: SelectorState;
   setSelectorState: React.Dispatch<React.SetStateAction<SelectorState>>;
   isUpdatingMatches: boolean;
@@ -986,7 +1000,6 @@ function SelectionBuilderPanel({
     [element],
   );
   const isSingleMode = selectorState.mode === "single";
-  const isValid = Boolean(selector);
   usePickerPreview(previewElement);
 
   const pickRelatedElement = (nextElement: Element) => {
@@ -1274,215 +1287,259 @@ function SelectionBuilderPanel({
               panelsTranslucent && "opacity-20",
             )}
           >
-          <Tabs
-            className="gap-3"
-            onValueChange={(value) => setMode(value as SelectorMode)}
-            value={selectorState.mode}
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="single">Single element</TabsTrigger>
-              <TabsTrigger value="series">Series</TabsTrigger>
-            </TabsList>
+            <Tabs
+              className="gap-3"
+              onValueChange={(value) => setMode(value as SelectorMode)}
+              value={selectorState.mode}
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="single">Single element</TabsTrigger>
+                <TabsTrigger value="series">Series</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="single">
-              <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
-                <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                  Static single selectors
-                </legend>
-                <RadioGroup
-                  className="grid gap-1 sm:grid-cols-2"
-                  onValueChange={(value) =>
-                    setSelectorState((current) => ({
-                      ...current,
-                      single: value as SingleSelectorKind,
-                    }))
+              {isEditingSelector ? (
+                <Textarea
+                  aria-label="Edit selector"
+                  className="min-h-32 resize-y font-mono text-xs leading-5"
+                  onChange={(event) =>
+                    onDraftSelectorChange(event.target.value)
                   }
-                  value={selectorState.single ?? ""}
-                >
-                  {singleOptions.map((option) => (
-                    <SelectorRadio
-                      disabled={option.disabled}
-                      key={option.kind}
-                      label={option.label}
-                      value={option.kind}
-                    />
-                  ))}
-                </RadioGroup>
-              </fieldset>
-            </TabsContent>
-
-            <TabsContent value="series">
-              <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
-                <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                  Series selectors
-                </legend>
-                <div className="grid gap-1 sm:grid-cols-2">
-                  <SelectorCheckbox
-                    checked={selectorState.series.tag}
-                    label={`tag <${element.tagName.toLowerCase()}>`}
-                    onChange={(checked) =>
-                      setSelectorState((current) => ({
-                        ...current,
-                        series: { ...current.series, tag: checked },
-                      }))
-                    }
-                  />
-                  {classOptions.map((option) => (
-                    <SelectorCheckbox
-                      checked={selectorState.series.classes.includes(
-                        option.value,
-                      )}
-                      key={option.value}
-                      label={option.label}
-                      onChange={(checked) => toggleClass(option.value, checked)}
-                    />
-                  ))}
-                  {attributeOptions.map((option) => (
-                    <SelectorCheckbox
-                      checked={selectorState.series.attributes.includes(
-                        option.value,
-                      )}
-                      key={option.value}
-                      label={option.label}
-                      onChange={(checked) =>
-                        toggleAttribute(option.value, checked)
-                      }
-                    />
-                  ))}
-                </div>
-                <div className="mt-3 grid gap-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                    Position pattern
-                  </div>
-                  <RadioGroup
-                    className="grid gap-1 sm:grid-cols-2"
-                    onValueChange={(value) =>
-                      setSelectorState((current) => ({
-                        ...current,
-                        series: {
-                          ...current.series,
-                          position: {
-                            ...current.series.position,
-                            kind: value as SeriesPositionKind,
-                          },
-                        },
-                      }))
-                    }
-                    value={selectorState.series.position.kind}
-                  >
-                    {[
-                      { kind: "any" as const, label: "Any position" },
-                      { kind: "first" as const, label: "First" },
-                      { kind: "last" as const, label: "Last" },
-                      { kind: "exact" as const, label: "Exact #" },
-                      { kind: "formula" as const, label: "Formula an+b" },
-                    ].map((option) => (
-                      <SelectorRadio
-                        key={option.kind}
-                        label={option.label}
-                        value={option.kind}
-                      />
-                    ))}
-                  </RadioGroup>
-                  {selectorState.series.position.kind === "exact" ? (
-                    <label className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-                      <span>Child number</span>
-                      <Input
-                        className="h-8 w-20"
-                        min={1}
-                        onChange={(event) => {
-                          const exact = Number(event.currentTarget.value) || 1;
-
+                  spellCheck={false}
+                  value={draftSelector}
+                />
+              ) : (
+                <>
+                  <TabsContent value="single">
+                    <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
+                      <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                        Static single selectors
+                      </legend>
+                      <RadioGroup
+                        className="grid gap-1 sm:grid-cols-2"
+                        onValueChange={(value) =>
                           setSelectorState((current) => ({
                             ...current,
-                            series: {
-                              ...current.series,
-                              position: {
-                                ...current.series.position,
-                                exact,
-                              },
-                            },
-                          }));
-                        }}
-                        type="number"
-                        value={selectorState.series.position.exact}
-                      />
-                    </label>
-                  ) : null}
-                  {selectorState.series.position.kind === "formula" ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <span>a</span>
-                        <Input
-                          className="h-8 w-20"
-                          min={1}
-                          onChange={(event) => {
-                            const step = Number(event.currentTarget.value) || 1;
+                            single: value as SingleSelectorKind,
+                          }))
+                        }
+                        value={selectorState.single ?? ""}
+                      >
+                        {singleOptions.map((option) => (
+                          <SelectorRadio
+                            disabled={option.disabled}
+                            key={option.kind}
+                            label={option.label}
+                            value={option.kind}
+                          />
+                        ))}
+                      </RadioGroup>
+                    </fieldset>
+                  </TabsContent>
 
+                  <TabsContent value="series">
+                    <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
+                      <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                        Series selectors
+                      </legend>
+                      <div className="grid gap-1 sm:grid-cols-2">
+                        <SelectorCheckbox
+                          checked={selectorState.series.tag}
+                          label={`tag <${element.tagName.toLowerCase()}>`}
+                          onChange={(checked) =>
+                            setSelectorState((current) => ({
+                              ...current,
+                              series: { ...current.series, tag: checked },
+                            }))
+                          }
+                        />
+                        {classOptions.map((option) => (
+                          <SelectorCheckbox
+                            checked={selectorState.series.classes.includes(
+                              option.value,
+                            )}
+                            key={option.value}
+                            label={option.label}
+                            onChange={(checked) =>
+                              toggleClass(option.value, checked)
+                            }
+                          />
+                        ))}
+                        {attributeOptions.map((option) => (
+                          <SelectorCheckbox
+                            checked={selectorState.series.attributes.includes(
+                              option.value,
+                            )}
+                            key={option.value}
+                            label={option.label}
+                            onChange={(checked) =>
+                              toggleAttribute(option.value, checked)
+                            }
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-3 grid gap-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                          Position pattern
+                        </div>
+                        <RadioGroup
+                          className="grid gap-1 sm:grid-cols-2"
+                          onValueChange={(value) =>
                             setSelectorState((current) => ({
                               ...current,
                               series: {
                                 ...current.series,
                                 position: {
                                   ...current.series.position,
-                                  step,
+                                  kind: value as SeriesPositionKind,
                                 },
                               },
-                            }));
-                          }}
-                          type="number"
-                          value={selectorState.series.position.step}
-                        />
-                      </label>
-                      <span className="text-sm font-bold text-muted-foreground">
-                        n +
-                      </span>
-                      <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                        <span>b</span>
-                        <Input
-                          className="h-8 w-20"
-                          min={0}
-                          onChange={(event) => {
-                            const offset =
-                              Number(event.currentTarget.value) || 0;
+                            }))
+                          }
+                          value={selectorState.series.position.kind}
+                        >
+                          {[
+                            { kind: "any" as const, label: "Any position" },
+                            { kind: "first" as const, label: "First" },
+                            { kind: "last" as const, label: "Last" },
+                            { kind: "exact" as const, label: "Exact #" },
+                            { kind: "formula" as const, label: "Formula an+b" },
+                          ].map((option) => (
+                            <SelectorRadio
+                              key={option.kind}
+                              label={option.label}
+                              value={option.kind}
+                            />
+                          ))}
+                        </RadioGroup>
+                        {selectorState.series.position.kind === "exact" ? (
+                          <label className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
+                            <span>Child number</span>
+                            <Input
+                              className="h-8 w-20"
+                              min={1}
+                              onChange={(event) => {
+                                const exact =
+                                  Number(event.currentTarget.value) || 1;
 
-                            setSelectorState((current) => ({
-                              ...current,
-                              series: {
-                                ...current.series,
-                                position: {
-                                  ...current.series.position,
-                                  offset,
-                                },
-                              },
-                            }));
-                          }}
-                          type="number"
-                          value={selectorState.series.position.offset}
-                        />
-                      </label>
-                      <span className="text-xs text-muted-foreground">
-                        Example: {selectorState.series.position.step}n+
-                        {selectorState.series.position.offset}
-                      </span>
-                    </div>
-                  ) : null}
-                </div>
-              </fieldset>
-            </TabsContent>
+                                setSelectorState((current) => ({
+                                  ...current,
+                                  series: {
+                                    ...current.series,
+                                    position: {
+                                      ...current.series.position,
+                                      exact,
+                                    },
+                                  },
+                                }));
+                              }}
+                              type="number"
+                              value={selectorState.series.position.exact}
+                            />
+                          </label>
+                        ) : null}
+                        {selectorState.series.position.kind === "formula" ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                              <span>a</span>
+                              <Input
+                                className="h-8 w-20"
+                                min={1}
+                                onChange={(event) => {
+                                  const step =
+                                    Number(event.currentTarget.value) || 1;
+
+                                  setSelectorState((current) => ({
+                                    ...current,
+                                    series: {
+                                      ...current.series,
+                                      position: {
+                                        ...current.series.position,
+                                        step,
+                                      },
+                                    },
+                                  }));
+                                }}
+                                type="number"
+                                value={selectorState.series.position.step}
+                              />
+                            </label>
+                            <span className="text-sm font-bold text-muted-foreground">
+                              n +
+                            </span>
+                            <label className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                              <span>b</span>
+                              <Input
+                                className="h-8 w-20"
+                                min={0}
+                                onChange={(event) => {
+                                  const offset =
+                                    Number(event.currentTarget.value) || 0;
+
+                                  setSelectorState((current) => ({
+                                    ...current,
+                                    series: {
+                                      ...current.series,
+                                      position: {
+                                        ...current.series.position,
+                                        offset,
+                                      },
+                                    },
+                                  }));
+                                }}
+                                type="number"
+                                value={selectorState.series.position.offset}
+                              />
+                            </label>
+                            <span className="text-xs text-muted-foreground">
+                              Example: {selectorState.series.position.step}n+
+                              {selectorState.series.position.offset}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                    </fieldset>
+                  </TabsContent>
+                </>
+            )}
           </Tabs>
 
-          <div className="grid gap-1 border-t border-border pt-3">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-              Selector
+          {isEditingSelector ? null : (
+            <div className="grid gap-1 border-t border-border pt-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  Selector
+                </div>
+                <Button
+                  aria-label="Edit selector"
+                  className="h-7 px-2 text-xs"
+                  onClick={onStartEditingSelector}
+                  type="button"
+                  variant="ghost"
+                >
+                  <Pencil className="size-3.5" aria-hidden="true" />
+                  Edit
+                </Button>
+              </div>
+              <code className="rounded-md border border-border bg-muted/60 px-2.5 py-2 font-mono text-xs leading-5 text-foreground break-all">
+                {selector ?? "No selector"}
+              </code>
             </div>
-            <code className="rounded-md border border-border bg-muted/60 px-2.5 py-2 font-mono text-xs leading-5 text-foreground break-all">
-              {selector ?? "No selector"}
-            </code>
-          </div>
+          )}
 
-          <footer className="flex justify-end border-t border-border pt-3">
-            <Button disabled={!isValid} onClick={onConfirm} type="button">
+          <footer className="flex items-center justify-between border-t border-border pt-3">
+            {isEditingSelector ? (
+              <Button
+                aria-label="Cancel manual selector editing"
+                onClick={onCancelEditingSelector}
+                type="button"
+                variant="ghost"
+              >
+                Cancel manual edit
+              </Button>
+            ) : (
+              <span aria-hidden="true" />
+            )}
+            <Button disabled={!canConfirm} onClick={onConfirm} type="button">
               Confirm
             </Button>
           </footer>
@@ -1515,6 +1572,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
     React.useState(false);
   const [isFloatingPanelCollapsed, setIsFloatingPanelCollapsed] =
     React.useState(false);
+  const [isEditingSelector, setIsEditingSelector] = React.useState(false);
+  const [draftSelector, setDraftSelector] = React.useState("");
   const [frontPanel, setFrontPanel] = React.useState<FrontPanel>("floating");
   const [selectorState, setSelectorState] = React.useState<SelectorState>({
     mode: "single",
@@ -1546,12 +1605,17 @@ export function MacroPanel({ project }: MacroPanelProps) {
       ? buildSingleSelector(pickedElement.element, deferredSelectorState.single)
       : buildSeriesSelector(pickedElement.element, deferredSelectorState.series);
   }, [deferredSelectorState, pickedElement]);
+  const effectiveSelector = isEditingSelector ? draftSelector.trim() : selector;
+  const effectivePreviewSelector = isEditingSelector
+    ? draftSelector.trim()
+    : previewSelector;
   const matches = React.useMemo(
-    () => getSelectorMatches(previewSelector),
-    [previewSelector],
+    () => getSelectorMatches(effectivePreviewSelector),
+    [effectivePreviewSelector],
   );
-  const isPreviewPending = selector !== previewSelector;
+  const isPreviewPending = effectiveSelector !== effectivePreviewSelector;
   const isUpdatingMatches = isPreviewPending || isRenderingHighlights;
+  const canConfirm = Boolean(effectivePreviewSelector) && matches.length > 0;
   const floatingPanelZIndex =
     frontPanel === "floating" ? PANEL_FRONT_Z_INDEX : PANEL_BACK_Z_INDEX;
   const selectionPanelZIndex =
@@ -1574,6 +1638,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
   const hideSelectionPanel = React.useCallback(() => {
     React.startTransition(() => {
       setIsNavigationPreviewActive(false);
+      setIsEditingSelector(false);
+      setDraftSelector("");
       setIsSelectionPanelVisible(false);
     });
   }, []);
@@ -1589,6 +1655,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
     setPickerContextMenu(null);
     React.startTransition(() => {
       setIsNavigationPreviewActive(false);
+      setIsEditingSelector(false);
+      setDraftSelector("");
       setPickedElement(nextElement);
       setSelectorState(getInitialSelectorState(nextElement.element));
       setFrontPanel("selection");
@@ -1602,6 +1670,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
       setPickerContextMenu(null);
       React.startTransition(() => {
         setIsNavigationPreviewActive(false);
+        setIsEditingSelector(false);
+        setDraftSelector("");
         setPickedElement(nextElement);
         setSelectorState(getInitialSelectorState(nextElement.element));
         setFrontPanel("selection");
@@ -1631,6 +1701,16 @@ export function MacroPanel({ project }: MacroPanelProps) {
     void copyTextToClipboard(selector);
   }, []);
 
+  const startEditingSelector = React.useCallback(() => {
+    setDraftSelector(selector ?? "");
+    setIsEditingSelector(true);
+  }, [selector]);
+
+  const cancelEditingSelector = React.useCallback(() => {
+    setIsEditingSelector(false);
+    setDraftSelector("");
+  }, []);
+
   useElementPicker(
     isPickingElement,
     handlePickElement,
@@ -1639,8 +1719,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
   );
   useSelectorHighlights(
     matches,
-    deferredSelectorState.mode === "series",
-    isSelectionPanelVisible && Boolean(previewSelector),
+    isEditingSelector || deferredSelectorState.mode === "series",
+    isSelectionPanelVisible && Boolean(effectivePreviewSelector),
     setIsRenderingHighlights,
   );
 
@@ -1873,6 +1953,12 @@ export function MacroPanel({ project }: MacroPanelProps) {
           onPickRelatedElement={handlePickRelatedElement}
           pickedElement={pickedElement}
           selector={selector}
+          isEditingSelector={isEditingSelector}
+          draftSelector={draftSelector}
+          onDraftSelectorChange={setDraftSelector}
+          onStartEditingSelector={startEditingSelector}
+          onCancelEditingSelector={cancelEditingSelector}
+          canConfirm={canConfirm}
           selectorState={selectorState}
           setSelectorState={setSelectorState}
           isUpdatingMatches={isUpdatingMatches}
