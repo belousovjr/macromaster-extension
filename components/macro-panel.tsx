@@ -376,18 +376,22 @@ function createHighlightElement(element: Element, index: number | null) {
   ].join(";");
 
   if (index != null) {
+    const hasBadgeSpaceAbove = rect.top >= 22;
+    const hasBadgeSpaceRight = rect.left + 22 <= window.innerWidth;
     const badge = document.createElement("div");
     badge.textContent = String(index);
     badge.style.cssText = [
       "position: absolute",
-      "left: -2px",
-      "top: -22px",
+      hasBadgeSpaceRight ? "left: -2px" : "right: -2px",
+      hasBadgeSpaceAbove ? "top: -22px" : "bottom: -22px",
       "min-width: 22px",
       "height: 20px",
       "display: flex",
       "align-items: center",
       "justify-content: center",
-      "border-radius: 4px 4px 0 0",
+      hasBadgeSpaceAbove
+        ? "border-radius: 4px 4px 0 0"
+        : "border-radius: 0 0 4px 4px",
       "background: #16a34a",
       "color: #f8fafc",
       "font: 700 12px/1 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif",
