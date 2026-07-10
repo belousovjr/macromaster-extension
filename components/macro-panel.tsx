@@ -52,6 +52,7 @@ const PICKER_Z_INDEX = 2147483646;
 const PANEL_BACK_Z_INDEX = 2147483645;
 const PANEL_FRONT_Z_INDEX = 2147483647;
 const SELECTOR_HIGHLIGHT_Z_INDEX = 2147483644;
+const HIGHLIGHT_RENDER_CHUNK_SIZE = 100;
 
 type Bounds = {
   x: number;
@@ -395,8 +396,6 @@ function createHighlightElement(element: Element, index: number | null) {
     highlight.append(badge);
   }
 
-  document.documentElement.append(highlight);
-
   return highlight;
 }
 
@@ -505,19 +504,80 @@ function useSelectorHighlights(
   matches: Element[],
   showNumbers: boolean,
   isEnabled: boolean,
+  onRenderingChange: (isRendering: boolean) => void,
 ) {
   React.useEffect(() => {
-    if (!isEnabled) return;
+    if (!isEnabled) {
+      onRenderingChange(false);
+      return;
+    }
 
-    const renderHighlights = () =>
-      matches.map((element, index) =>
-        createHighlightElement(element, showNumbers ? index + 1 : null),
-      );
-    let highlights = renderHighlights();
+    const highlightRoot = document.createElement("div");
+    let renderFrame = 0;
+    let renderToken = 0;
+
+    highlightRoot.setAttribute(OVERLAY_ATTR, "true");
+    document.documentElement.append(highlightRoot);
+
+    const cancelRender = () => {
+      if (renderFrame) {
+        cancelAnimationFrame(renderFrame);
+        renderFrame = 0;
+      }
+      renderToken += 1;
+    };
+
+    const renderHighlights = () => {
+      cancelRender();
+      highlightRoot.replaceChildren();
+
+      const token = renderToken;
+      let index = 0;
+
+      if (matches.length === 0) {
+        onRenderingChange(false);
+        return;
+      }
+
+      onRenderingChange(true);
+
+      const renderChunk = () => {
+        if (token !== renderToken) return;
+
+        const fragment = document.createDocumentFragment();
+        const endIndex = Math.min(
+          index + HIGHLIGHT_RENDER_CHUNK_SIZE,
+          matches.length,
+        );
+
+        for (; index < endIndex; index += 1) {
+          fragment.append(
+            createHighlightElement(
+              matches[index],
+              showNumbers ? index + 1 : null,
+            ),
+          );
+        }
+
+        highlightRoot.append(fragment);
+
+        if (index < matches.length) {
+          renderFrame = requestAnimationFrame(renderChunk);
+        } else {
+          renderFrame = 0;
+          if (token === renderToken) {
+            onRenderingChange(false);
+          }
+        }
+      };
+
+      renderFrame = requestAnimationFrame(renderChunk);
+    };
+
+    renderHighlights();
 
     const handleUpdate = () => {
-      highlights.forEach((highlight) => highlight.remove());
-      highlights = renderHighlights();
+      renderHighlights();
     };
 
     window.addEventListener("scroll", handleUpdate, true);
@@ -526,9 +586,11 @@ function useSelectorHighlights(
     return () => {
       window.removeEventListener("scroll", handleUpdate, true);
       window.removeEventListener("resize", handleUpdate);
-      highlights.forEach((highlight) => highlight.remove());
+      cancelRender();
+      onRenderingChange(false);
+      highlightRoot.remove();
     };
-  }, [isEnabled, matches, showNumbers]);
+  }, [isEnabled, matches, onRenderingChange, showNumbers]);
 }
 
 function useElementPicker(
@@ -806,7 +868,7 @@ function SelectionBuilderPanel({
   selector,
   selectorState,
   setSelectorState,
-  isPreviewPending,
+  isUpdatingMatches,
 }: {
   zIndex: number;
   panelsTranslucent: boolean;
@@ -820,7 +882,7 @@ function SelectionBuilderPanel({
   selector: string | null;
   selectorState: SelectorState;
   setSelectorState: React.Dispatch<React.SetStateAction<SelectorState>>;
-  isPreviewPending: boolean;
+  isUpdatingMatches: boolean;
 }) {
   const element = pickedElement.element;
   const [previewElement, setPreviewElement] = React.useState<Element | null>(
@@ -830,6 +892,8 @@ function SelectionBuilderPanel({
   const [activeNavigationSub, setActiveNavigationSub] = React.useState<
     "children" | null
   >(null);
+  const [isMatchNavigationOpen, setIsMatchNavigationOpen] =
+    React.useState(false);
   const [matchNavigationSelectKey, setMatchNavigationSelectKey] =
     React.useState(0);
   const setPreviewElementInTransition = (nextElement: Element | null) => {
@@ -872,7 +936,6 @@ function SelectionBuilderPanel({
     () =>
       matches.map((match, index) => ({
         element: match,
-        description: describeElement(match),
         value: String(index),
       })),
     [matches],
@@ -926,6 +989,7 @@ function SelectionBuilderPanel({
     if (!matchElement) return;
 
     scrollElementToPageTop(matchElement);
+    setIsMatchNavigationOpen(false);
     setMatchNavigationSelectKey((key) => key + 1);
   };
 
@@ -1012,7 +1076,7 @@ function SelectionBuilderPanel({
                   ? pickedElement.description.details
                   : ""}
               </div>
-              {isPreviewPending ? (
+              {isUpdatingMatches ? (
                 <LoaderCircle
                   className="size-3.5 shrink-0 animate-spin text-muted-foreground"
                   aria-label="Updating matches"
@@ -1026,6 +1090,8 @@ function SelectionBuilderPanel({
           <div className="ml-auto flex shrink-0 items-center gap-1">
             <Select
               key={matchNavigationSelectKey}
+              open={isMatchNavigationOpen}
+              onOpenChange={setIsMatchNavigationOpen}
               onValueChange={navigateToMatchElement}
             >
               <SelectTrigger
@@ -1038,34 +1104,38 @@ function SelectionBuilderPanel({
                   placeholder={`nav to match (${matchOptions.length})`}
                 />
               </SelectTrigger>
-              <SelectContent
-                align="end"
-                className="pointer-events-auto max-h-72 w-80"
-              >
-                {matchOptions.length > 0 ? (
-                  matchOptions.map((option, index) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="shrink-0 text-xs font-semibold text-muted-foreground">
-                          #{index + 1}
-                        </span>
-                        <span className="min-w-0 truncate">
-                          <span className="text-primary">
-                            {option.description.tag}
+              {isMatchNavigationOpen ? (
+                <SelectContent
+                  align="end"
+                  className="pointer-events-auto max-h-72 w-80"
+                >
+                  {matchOptions.length > 0 ? (
+                    matchOptions.map((option, index) => {
+                      const description = describeElement(option.element);
+
+                      return (
+                        <SelectItem key={option.value} value={option.value}>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="shrink-0 text-xs font-semibold text-muted-foreground">
+                              #{index + 1}
+                            </span>
+                            <span className="min-w-0 truncate">
+                              <span className="text-primary">
+                                {description.tag}
+                              </span>
+                              {description.details ? description.details : ""}
+                            </span>
                           </span>
-                          {option.description.details
-                            ? option.description.details
-                            : ""}
-                        </span>
-                      </span>
+                        </SelectItem>
+                      );
+                    })
+                  ) : (
+                    <SelectItem disabled value="no-match-elements">
+                      No match elements
                     </SelectItem>
-                  ))
-                ) : (
-                  <SelectItem disabled value="no-match-elements">
-                    No match elements
-                  </SelectItem>
-                )}
-              </SelectContent>
+                  )}
+                </SelectContent>
+              ) : null}
             </Select>
             {isSingleMode &&
             (parentOption || childOptions.length > 0) ? (
@@ -1391,6 +1461,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
     React.useState(false);
   const [isNavigationPreviewActive, setIsNavigationPreviewActive] =
     React.useState(false);
+  const [isRenderingHighlights, setIsRenderingHighlights] =
+    React.useState(false);
   const [frontPanel, setFrontPanel] = React.useState<FrontPanel>("floating");
   const [selectorState, setSelectorState] = React.useState<SelectorState>({
     mode: "single",
@@ -1427,6 +1499,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
     [previewSelector],
   );
   const isPreviewPending = selector !== previewSelector;
+  const isUpdatingMatches = isPreviewPending || isRenderingHighlights;
   const floatingPanelZIndex =
     frontPanel === "floating" ? PANEL_FRONT_Z_INDEX : PANEL_BACK_Z_INDEX;
   const selectionPanelZIndex =
@@ -1516,6 +1589,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
     matches,
     deferredSelectorState.mode === "series",
     isSelectionPanelVisible && Boolean(previewSelector),
+    setIsRenderingHighlights,
   );
 
   React.useEffect(() => {
@@ -1720,7 +1794,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
           selector={selector}
           selectorState={selectorState}
           setSelectorState={setSelectorState}
-          isPreviewPending={isPreviewPending}
+          isUpdatingMatches={isUpdatingMatches}
         />
       ) : null}
       {isPickingElement ? (
