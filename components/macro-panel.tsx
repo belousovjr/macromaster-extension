@@ -255,7 +255,7 @@ function getInitialSelectorState(element: Element): SelectorState {
 
   return {
     mode: "single",
-    single: "nth",
+    single: element.id ? "id" : "nth",
     series: {
       tag: true,
       classes: [],
