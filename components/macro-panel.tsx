@@ -863,6 +863,7 @@ function SelectorRadio({
 function SelectionBuilderPanel({
   zIndex,
   panelsTranslucent,
+  isPickingElement,
   matches,
   onInteract,
   onPreviewActiveChange,
@@ -877,6 +878,7 @@ function SelectionBuilderPanel({
 }: {
   zIndex: number;
   panelsTranslucent: boolean;
+  isPickingElement: boolean;
   matches: Element[];
   onInteract: () => void;
   onPreviewActiveChange: (isActive: boolean) => void;
@@ -914,6 +916,13 @@ function SelectionBuilderPanel({
     },
     [onPreviewActiveChange],
   );
+  React.useEffect(() => {
+    if (!isPickingElement) return;
+
+    setNavigationMenuOpen(false);
+    setActiveNavigationSub(null);
+    setPreviewElementInTransition(null);
+  }, [isPickingElement]);
   const parentOption = React.useMemo(() => {
     const parent = element.parentElement;
     if (
@@ -1160,7 +1169,11 @@ function SelectionBuilderPanel({
                 <DropdownMenuTrigger asChild>
                   <Button
                     aria-label="Open element navigation menu"
-                    className="pointer-events-auto size-8 shrink-0"
+                    className={cn(
+                      "pointer-events-auto size-8 shrink-0",
+                      isPickingElement && "opacity-20",
+                    )}
+                    disabled={isPickingElement}
                     size="icon"
                     type="button"
                     variant="outline"
@@ -1842,6 +1855,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
         <SelectionBuilderPanel
           zIndex={selectionPanelZIndex}
           panelsTranslucent={panelsTranslucent}
+          isPickingElement={isPickingElement}
           matches={matches}
           onInteract={bringSelectionPanelToFront}
           onPreviewActiveChange={setIsNavigationPreviewActive}
