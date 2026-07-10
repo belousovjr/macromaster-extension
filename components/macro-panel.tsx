@@ -342,14 +342,24 @@ function buildSeriesSelector(element: Element, state: SeriesSelectorState) {
   return parts.join("");
 }
 
-function getSelectorMatches(selector: string | null) {
+function isPageElement(element: Element) {
+  return (
+    !element.closest(PANEL_HOST_TAG) && !element.closest(`[${OVERLAY_ATTR}]`)
+  );
+}
+
+function getSelectorMatches(selector: string | null, mode: SelectorMode) {
   if (!selector) return [];
 
   try {
+    if (mode === "single") {
+      const element = document.querySelector(selector);
+
+      return element && isPageElement(element) ? [element] : [];
+    }
+
     return Array.from(document.querySelectorAll(selector)).filter(
-      (element) =>
-        !element.closest(PANEL_HOST_TAG) &&
-        !element.closest(`[${OVERLAY_ATTR}]`),
+      isPageElement,
     );
   } catch {
     return [];
@@ -1609,10 +1619,12 @@ export function MacroPanel({ project }: MacroPanelProps) {
   const effectivePreviewSelector = isEditingSelector
     ? draftSelector.trim()
     : previewSelector;
-  const matches = React.useMemo(
-    () => getSelectorMatches(effectivePreviewSelector),
-    [effectivePreviewSelector],
-  );
+  const effectivePreviewMode = isEditingSelector
+    ? selectorState.mode
+    : deferredSelectorState.mode;
+  const matches = React.useMemo(() => {
+    return getSelectorMatches(effectivePreviewSelector, effectivePreviewMode);
+  }, [effectivePreviewMode, effectivePreviewSelector]);
   const isPreviewPending = effectiveSelector !== effectivePreviewSelector;
   const isUpdatingMatches = isPreviewPending || isRenderingHighlights;
   const canConfirm = Boolean(effectivePreviewSelector) && matches.length > 0;
@@ -1647,8 +1659,12 @@ export function MacroPanel({ project }: MacroPanelProps) {
   const closeSelectionPanel = hideSelectionPanel;
 
   const confirmSelection = React.useCallback(() => {
+    console.log("MacroMaster selector confirmed", {
+      selector: effectiveSelector,
+      isSingle: selectorState.mode === "single",
+    });
     hideSelectionPanel();
-  }, [hideSelectionPanel]);
+  }, [effectiveSelector, hideSelectionPanel, selectorState.mode]);
 
   const handlePickElement = React.useCallback((nextElement: PickedElement) => {
     setIsPickingElement(false);
@@ -1719,7 +1735,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
   );
   useSelectorHighlights(
     matches,
-    isEditingSelector || deferredSelectorState.mode === "series",
+    effectivePreviewMode === "series",
     isSelectionPanelVisible && Boolean(effectivePreviewSelector),
     setIsRenderingHighlights,
   );
