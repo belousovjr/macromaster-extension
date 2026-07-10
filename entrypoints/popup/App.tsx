@@ -74,8 +74,8 @@ function formatRelativeTabPosition(fromTab: PopupTabInfo, toTab: PopupTabInfo) {
   }
 
   const count = Math.abs(offset);
-  const noun = count === 1 ? 'tab' : 'tabs';
-  const direction = offset > 0 ? 'right' : 'left';
+  const noun = count === 1 ? 'вкладку' : count < 5 ? 'вкладки' : 'вкладок';
+  const direction = offset > 0 ? 'справа' : 'слева';
 
   return `${count} ${noun} ${direction}`;
 }
@@ -143,19 +143,19 @@ function App() {
 
   const getProjectStatus = (projectId: string) => {
     if (projectId !== state.activeProjectId) {
-      return 'Closed';
+      return 'Закрыт';
     }
 
     if (state.activeProjectTabId == null || activeProjectTab == null) {
-      return 'Other tab';
+      return 'Другая вкладка';
     }
 
     if (state.activeProjectTabId === currentTab?.id) {
-      return 'Active';
+      return 'Активен';
     }
 
     if (currentTab != null && currentTab.windowId !== activeProjectTab.windowId) {
-      return 'Other window';
+      return 'Другое окно';
     }
 
     const relativePosition =
@@ -164,10 +164,10 @@ function App() {
         : formatRelativeTabPosition(currentTab, activeProjectTab);
 
     if (!relativePosition) {
-      return 'Other tab';
+      return 'Другая вкладка';
     }
 
-    return `Tab #${activeProjectTab.number}, ${relativePosition}`;
+    return `Вкладка #${activeProjectTab.number}, ${relativePosition}`;
   };
 
   return (
@@ -176,7 +176,7 @@ function App() {
         <p className="mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-muted-foreground">
           MacroMaster
         </p>
-        <h1 className="text-xl font-semibold leading-tight">Projects</h1>
+        <h1 className="text-xl font-semibold leading-tight">Проекты</h1>
       </div>
 
       <form className="grid gap-2" onSubmit={handleCreateProject}>
@@ -184,7 +184,7 @@ function App() {
           className="text-xs font-semibold text-muted-foreground"
           htmlFor="project-name"
         >
-          New project
+          Новый проект
         </label>
         <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
           <Input
@@ -192,7 +192,7 @@ function App() {
             disabled={!isReady}
             id="project-name"
             onChange={(event) => setProjectName(event.target.value)}
-            placeholder="Project name"
+            placeholder="Название проекта"
             type="text"
             value={projectName}
           />
@@ -200,23 +200,23 @@ function App() {
             disabled={!isReady || currentTab == null || !projectName.trim()}
             type="submit"
           >
-            Create
+            Создать
           </Button>
         </div>
       </form>
 
       <section
         className="overflow-hidden rounded-lg border border-border bg-card"
-        aria-label="Existing projects"
+        aria-label="Существующие проекты"
       >
         <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2 text-[11px] font-bold uppercase tracking-[0.06em] text-muted-foreground">
-          <span>Name</span>
-          <span>Status</span>
+          <span>Название</span>
+          <span>Статус</span>
         </div>
         <div className="max-h-[220px] overflow-y-auto" role="list">
           {state.projects.length === 0 ? (
             <p className="m-0 px-3 py-6 text-center text-sm text-muted-foreground">
-              No projects yet
+              Проектов пока нет
             </p>
           ) : (
             state.projects.map((project) => {

@@ -993,17 +993,17 @@ function SelectionBuilderPanel({
       },
       {
         kind: "nth" as const,
-        label: `child #${getElementIndex(element)} in parent`,
+        label: `дочерний #${getElementIndex(element)} в родителе`,
         disabled: !element.parentElement,
       },
       {
         kind: "first" as const,
-        label: "first in parent",
+        label: "первый в родителе",
         disabled: getElementIndex(element) !== 1,
       },
       {
         kind: "last" as const,
-        label: "last in parent",
+        label: "последний в родителе",
         disabled: !isLastElement(element),
       },
     ],
@@ -1118,12 +1118,12 @@ function SelectionBuilderPanel({
               {isUpdatingMatches ? (
                 <LoaderCircle
                   className="size-3.5 shrink-0 animate-spin text-muted-foreground"
-                  aria-label="Updating matches"
+                  aria-label="Обновление совпадений"
                 />
               ) : null}
             </div>
             <div className="truncate text-xs text-muted-foreground">
-              {matches.length} match{matches.length === 1 ? "" : "es"}
+              Совпадений: {matches.length}
             </div>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
@@ -1134,13 +1134,13 @@ function SelectionBuilderPanel({
               onValueChange={navigateToMatchElement}
             >
               <SelectTrigger
-                aria-label="Navigate to match element"
-                className="pointer-events-auto mr-2 h-8 w-[190px] shrink-0"
+                aria-label="Перейти к совпавшему элементу"
+                className="pointer-events-auto mr-2 h-8 shrink-0"
                 size="sm"
               >
                 <ListTree className="size-4" aria-hidden="true" />
                 <SelectValue
-                  placeholder={`nav to match (${matchOptions.length})`}
+                  placeholder={`перейти к совпадению (${matchOptions.length})`}
                 />
               </SelectTrigger>
               {isMatchNavigationOpen ? (
@@ -1170,7 +1170,7 @@ function SelectionBuilderPanel({
                     })
                   ) : (
                     <SelectItem disabled value="no-match-elements">
-                      No match elements
+                      Совпавших элементов нет
                     </SelectItem>
                   )}
                 </SelectContent>
@@ -1191,7 +1191,7 @@ function SelectionBuilderPanel({
               >
                 <DropdownMenuTrigger asChild>
                   <Button
-                    aria-label="Open element navigation menu"
+                    aria-label="Открыть меню навигации по элементам"
                     className={cn(
                       "pointer-events-auto size-8 shrink-0",
                       isPickingElement && "opacity-20",
@@ -1220,7 +1220,7 @@ function SelectionBuilderPanel({
                       onSelect={() => pickRelatedElement(parentOption.element)}
                     >
                       <span className="min-w-0 truncate">
-                        Parent: {parentOption.label}
+                        Родитель: {parentOption.label}
                       </span>
                     </DropdownMenuItem>
                   ) : null}
@@ -1231,7 +1231,7 @@ function SelectionBuilderPanel({
                         setActiveNavigationSub(isOpen ? "children" : null)
                       }
                     >
-                      <DropdownMenuSubTrigger>Children ({childOptions.length})</DropdownMenuSubTrigger>
+                      <DropdownMenuSubTrigger>Дочерние ({childOptions.length})</DropdownMenuSubTrigger>
                       <DropdownMenuSubContent className="pointer-events-auto max-h-72 w-72 overflow-y-auto">
                         {childOptions.map((child) => (
                           <DropdownMenuItem
@@ -1261,8 +1261,8 @@ function SelectionBuilderPanel({
             <Button
               aria-label={
                 isCollapsed
-                  ? "Expand selector panel"
-                  : "Collapse selector panel"
+                  ? "Развернуть панель селектора"
+                  : "Свернуть панель селектора"
               }
               aria-pressed={isCollapsed}
               className={cn(
@@ -1271,14 +1271,14 @@ function SelectionBuilderPanel({
               )}
               onClick={() => setIsCollapsed((current) => !current)}
               size="icon"
-              title={isCollapsed ? "Expand panel" : "Collapse panel"}
+              title={isCollapsed ? "Развернуть панель" : "Свернуть панель"}
               type="button"
               variant="ghost"
             >
               <Minus className="size-4" aria-hidden="true" />
             </Button>
             <Button
-              aria-label="Close selector panel"
+              aria-label="Закрыть панель селектора"
               className="size-7 text-muted-foreground hover:text-foreground"
               onClick={onClose}
               size="icon"
@@ -1303,13 +1303,13 @@ function SelectionBuilderPanel({
               value={selectorState.mode}
             >
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="single">Single element</TabsTrigger>
-                <TabsTrigger value="series">Series</TabsTrigger>
+                <TabsTrigger value="single">Один элемент</TabsTrigger>
+                <TabsTrigger value="series">Серия</TabsTrigger>
               </TabsList>
 
               {isEditingSelector ? (
                 <Textarea
-                  aria-label="Edit selector"
+                  aria-label="Редактировать селектор"
                   className="min-h-32 resize-y font-mono text-xs leading-5"
                   onChange={(event) =>
                     onDraftSelectorChange(event.target.value)
@@ -1322,7 +1322,7 @@ function SelectionBuilderPanel({
                   <TabsContent value="single">
                     <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
                       <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                        Static single selectors
+                        Статические селекторы одного элемента
                       </legend>
                       <RadioGroup
                         className="grid gap-1 sm:grid-cols-2"
@@ -1349,12 +1349,12 @@ function SelectionBuilderPanel({
                   <TabsContent value="series">
                     <fieldset className="rounded-lg border border-border px-3 pb-3 pt-2">
                       <legend className="px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                        Series selectors
+                        Селекторы серии
                       </legend>
                       <div className="grid gap-1 sm:grid-cols-2">
                         <SelectorCheckbox
                           checked={selectorState.series.tag}
-                          label={`tag <${element.tagName.toLowerCase()}>`}
+                          label={`тег <${element.tagName.toLowerCase()}>`}
                           onChange={(checked) =>
                             setSelectorState((current) => ({
                               ...current,
@@ -1389,7 +1389,7 @@ function SelectionBuilderPanel({
                       </div>
                       <div className="mt-3 grid gap-2">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                          Position pattern
+                          Шаблон позиции
                         </div>
                         <RadioGroup
                           className="grid gap-1 sm:grid-cols-2"
@@ -1408,11 +1408,11 @@ function SelectionBuilderPanel({
                           value={selectorState.series.position.kind}
                         >
                           {[
-                            { kind: "any" as const, label: "Any position" },
-                            { kind: "first" as const, label: "First" },
-                            { kind: "last" as const, label: "Last" },
-                            { kind: "exact" as const, label: "Exact #" },
-                            { kind: "formula" as const, label: "Formula an+b" },
+                            { kind: "any" as const, label: "Любая позиция" },
+                            { kind: "first" as const, label: "Первый" },
+                            { kind: "last" as const, label: "Последний" },
+                            { kind: "exact" as const, label: "Точный номер" },
+                            { kind: "formula" as const, label: "Формула an+b" },
                           ].map((option) => (
                             <SelectorRadio
                               key={option.kind}
@@ -1423,7 +1423,7 @@ function SelectionBuilderPanel({
                         </RadioGroup>
                         {selectorState.series.position.kind === "exact" ? (
                           <label className="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-                            <span>Child number</span>
+                            <span>Номер дочернего элемента</span>
                             <Input
                               className="h-8 w-20"
                               min={1}
@@ -1501,7 +1501,7 @@ function SelectionBuilderPanel({
                               />
                             </label>
                             <span className="text-xs text-muted-foreground">
-                              Example: {selectorState.series.position.step}n+
+                              Пример: {selectorState.series.position.step}n+
                               {selectorState.series.position.offset}
                             </span>
                           </div>
@@ -1517,21 +1517,21 @@ function SelectionBuilderPanel({
             <div className="grid gap-1 border-t border-border pt-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                  Selector
+                  Селектор
                 </div>
                 <Button
-                  aria-label="Edit selector"
+                  aria-label="Редактировать селектор"
                   className="h-7 px-2 text-xs"
                   onClick={onStartEditingSelector}
                   type="button"
                   variant="ghost"
                 >
                   <Pencil className="size-3.5" aria-hidden="true" />
-                  Edit
+                  Изменить
                 </Button>
               </div>
               <code className="rounded-md border border-border bg-muted/60 px-2.5 py-2 font-mono text-xs leading-5 text-foreground break-all">
-                {selector ?? "No selector"}
+                {selector ?? "Селектор не задан"}
               </code>
             </div>
           )}
@@ -1539,18 +1539,18 @@ function SelectionBuilderPanel({
           <footer className="flex items-center justify-between border-t border-border pt-3">
             {isEditingSelector ? (
               <Button
-                aria-label="Cancel manual selector editing"
+                aria-label="Отменить ручное редактирование селектора"
                 onClick={onCancelEditingSelector}
                 type="button"
                 variant="ghost"
               >
-                Cancel manual edit
+                Отменить ручную правку
               </Button>
             ) : (
               <span aria-hidden="true" />
             )}
             <Button disabled={!canConfirm} onClick={onConfirm} type="button">
-              Confirm
+              Подтвердить
             </Button>
           </footer>
         </div>
@@ -1870,7 +1870,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
               </div>
             </div>
             <Button
-              aria-label="Select element on page"
+              aria-label="Выбрать элемент на странице"
               aria-pressed={isPickingElement}
               className={cn(
                 "size-7 text-muted-foreground hover:text-foreground",
@@ -1881,7 +1881,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
               }}
               onPointerDown={(event) => event.stopPropagation()}
               size="icon"
-              title="Select element"
+              title="Выбрать элемент"
               type="button"
               variant="ghost"
             >
@@ -1890,8 +1890,8 @@ export function MacroPanel({ project }: MacroPanelProps) {
             <Button
               aria-label={
                 isFloatingPanelCollapsed
-                  ? "Expand project panel"
-                  : "Collapse project panel"
+                  ? "Развернуть панель проекта"
+                  : "Свернуть панель проекта"
               }
               aria-pressed={isFloatingPanelCollapsed}
               className={cn(
@@ -1904,7 +1904,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
               onPointerDown={(event) => event.stopPropagation()}
               size="icon"
               title={
-                isFloatingPanelCollapsed ? "Expand panel" : "Collapse panel"
+                isFloatingPanelCollapsed ? "Развернуть панель" : "Свернуть панель"
               }
               type="button"
               variant="ghost"
@@ -1912,7 +1912,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
               <Minus className="size-4" aria-hidden="true" />
             </Button>
             <Button
-              aria-label="Close project"
+              aria-label="Закрыть проект"
               className="size-7 text-muted-foreground hover:text-foreground"
               onClick={() => void closeActiveProject()}
               onPointerDown={(event) => event.stopPropagation()}
@@ -1931,14 +1931,14 @@ export function MacroPanel({ project }: MacroPanelProps) {
               panelsTranslucent ? "bg-card/20" : "bg-card",
             )}
           >
-            <p className="text-sm font-medium text-foreground">Hello world</p>
+            <p className="text-sm font-medium text-foreground">Готов к записи макроса</p>
             {pickedElement ? (
               <p className="max-w-full truncate text-xs text-muted-foreground">
-                Selected: {pickedElement.description.label}
+                Выбрано: {pickedElement.description.label}
               </p>
             ) : (
               <p className="max-w-full truncate text-xs text-muted-foreground">
-                {isPickingElement ? "Hover and click an element" : project.id}
+                {isPickingElement ? "Наведите и нажмите на элемент" : project.id}
               </p>
             )}
           </main>
@@ -1946,7 +1946,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
 
           {isFloatingPanelCollapsed ? null : (
           <button
-            aria-label="Resize MacroMaster panel"
+            aria-label="Изменить размер панели MacroMaster"
             className="absolute bottom-1 right-1 size-5 cursor-nwse-resize rounded-sm text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
             onPointerDown={startResize}
             type="button"

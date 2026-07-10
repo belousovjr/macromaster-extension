@@ -77,7 +77,7 @@ export async function getProjectState(): Promise<ProjectState> {
 export async function createProjectAndOpen(name: string, tabId: number) {
   const normalizedName = normalizeProjectName(name);
   if (!normalizedName) {
-    throw new Error('Project name is required');
+    throw new Error('Название проекта обязательно');
   }
 
   const state = await getProjectState();
