@@ -1401,6 +1401,7 @@ export function MacroPanel({ project }: MacroPanelProps) {
       React.startTransition(() => {
         setIsNavigationPreviewActive(false);
         setPickedElement(nextElement);
+        setSelectorState(getInitialSelectorState(nextElement.element));
         setFrontPanel("selection");
         setIsSelectionPanelVisible(true);
       });
