@@ -31,13 +31,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { closeActiveProject, type MacroProject } from "@/lib/projects";
@@ -926,7 +919,7 @@ function SelectionBuilderPanel({
   const [isMatchNavigationOpen, setIsMatchNavigationOpen] =
     React.useState(false);
   const [isCollapsed, setIsCollapsed] = React.useState(false);
-  const [matchNavigationSelectKey, setMatchNavigationSelectKey] =
+  const [matchNavigationMenuKey, setMatchNavigationMenuKey] =
     React.useState(0);
   const setPreviewElementInTransition = (nextElement: Element | null) => {
     React.startTransition(() => {
@@ -1028,7 +1021,7 @@ function SelectionBuilderPanel({
 
     scrollElementToPageTop(matchElement);
     setIsMatchNavigationOpen(false);
-    setMatchNavigationSelectKey((key) => key + 1);
+    setMatchNavigationMenuKey((key) => key + 1);
   };
 
   const setMode = (mode: SelectorMode) => {
@@ -1127,33 +1120,38 @@ function SelectionBuilderPanel({
             </div>
           </div>
           <div className="ml-auto flex shrink-0 items-center gap-1">
-            <Select
-              key={matchNavigationSelectKey}
+            <DropdownMenu
+              key={matchNavigationMenuKey}
+              modal={false}
               open={isMatchNavigationOpen}
               onOpenChange={setIsMatchNavigationOpen}
-              onValueChange={navigateToMatchElement}
             >
-              <SelectTrigger
-                aria-label="Перейти к совпавшему элементу"
-                className="pointer-events-auto mr-2 h-8 shrink-0"
-                size="sm"
-              >
-                <ListTree className="size-4" aria-hidden="true" />
-                <SelectValue
-                  placeholder={`перейти к совпадению (${matchOptions.length})`}
-                />
-              </SelectTrigger>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  aria-label="Перейти к совпавшему элементу"
+                  className="pointer-events-auto mr-2 h-8 shrink-0 gap-2 px-3"
+                  size="sm"
+                  type="button"
+                  variant="outline"
+                >
+                  <ListTree className="size-4" aria-hidden="true" />
+                  перейти к совпадению ({matchOptions.length})
+                </Button>
+              </DropdownMenuTrigger>
               {isMatchNavigationOpen ? (
-                <SelectContent
+                <DropdownMenuContent
                   align="end"
-                  className="pointer-events-auto max-h-72 w-80"
+                  className="pointer-events-auto max-h-72 w-80 overflow-y-auto"
                 >
                   {matchOptions.length > 0 ? (
                     matchOptions.map((option, index) => {
                       const description = describeElement(option.element);
 
                       return (
-                        <SelectItem key={option.value} value={option.value}>
+                        <DropdownMenuItem
+                          key={option.value}
+                          onSelect={() => navigateToMatchElement(option.value)}
+                        >
                           <span className="flex min-w-0 items-center gap-2">
                             <span className="shrink-0 text-xs font-semibold text-muted-foreground">
                               #{index + 1}
@@ -1165,17 +1163,17 @@ function SelectionBuilderPanel({
                               {description.details ? description.details : ""}
                             </span>
                           </span>
-                        </SelectItem>
+                        </DropdownMenuItem>
                       );
                     })
                   ) : (
-                    <SelectItem disabled value="no-match-elements">
+                    <DropdownMenuItem disabled>
                       Совпавших элементов нет
-                    </SelectItem>
+                    </DropdownMenuItem>
                   )}
-                </SelectContent>
+                </DropdownMenuContent>
               ) : null}
-            </Select>
+            </DropdownMenu>
             {isSingleMode &&
             (parentOption || childOptions.length > 0) ? (
               <DropdownMenu
