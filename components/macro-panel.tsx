@@ -1472,6 +1472,15 @@ function SelectionBuilderPanel({
             </TabsContent>
           </Tabs>
 
+          <div className="grid gap-1 border-t border-border pt-3">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+              Selector
+            </div>
+            <code className="rounded-md border border-border bg-muted/60 px-2.5 py-2 font-mono text-xs leading-5 text-foreground break-all">
+              {selector ?? "No selector"}
+            </code>
+          </div>
+
           <footer className="flex justify-end border-t border-border pt-3">
             <Button disabled={!isValid} onClick={onConfirm} type="button">
               Confirm
