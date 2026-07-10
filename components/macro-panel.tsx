@@ -1025,7 +1025,7 @@ function SelectionBuilderPanel({
                       onSelect={() => pickRelatedElement(parentOption.element)}
                     >
                       <span className="min-w-0 truncate">
-                        Родитель: {parentOption.label}
+                        Parent: {parentOption.label}
                       </span>
                     </DropdownMenuItem>
                   ) : null}
@@ -1036,7 +1036,7 @@ function SelectionBuilderPanel({
                         setActiveNavigationSub(isOpen ? "children" : null)
                       }
                     >
-                      <DropdownMenuSubTrigger>Дети</DropdownMenuSubTrigger>
+                      <DropdownMenuSubTrigger>Children ({childOptions.length})</DropdownMenuSubTrigger>
                       <DropdownMenuSubContent className="pointer-events-auto max-h-72 w-72 overflow-y-auto">
                         {childOptions.map((child) => (
                           <DropdownMenuItem
